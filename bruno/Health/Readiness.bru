@@ -1,0 +1,34 @@
+meta {
+  name: Readiness
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/ready
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns 200 when MongoDB is connected, otherwise 503", function () {
+    expect([200, 503]).to.include(res.getStatus());
+  });
+
+  test("uses the matching response envelope", function () {
+    const body = res.getBody();
+    if (res.getStatus() === 200) {
+      expect(body.data).to.eql({ status: "ready", checks: { database: "connected" } });
+    } else {
+      expect(body.error.code).to.equal("SERVICE_UNAVAILABLE");
+      expect(body.error.requestId).to.be.a("string");
+    }
+  });
+}
+
+docs {
+  Readiness probe. Returns 200 only while MongoDB is connected; otherwise 503 with
+  `{ "error": { "code": "SERVICE_UNAVAILABLE", ... } }`.
+
+  Stop MongoDB (or point `MONGODB_URI` at an unused port) to see the 503 response.
+}
