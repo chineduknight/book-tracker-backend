@@ -1,0 +1,21 @@
+meta {
+  name: Liveness
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/health
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.data.status: eq "ok"
+  res.body.data.timestamp: isString
+}
+
+docs {
+  Liveness probe. Returns 200 whenever the process is serving HTTP, even if MongoDB is down.
+}
