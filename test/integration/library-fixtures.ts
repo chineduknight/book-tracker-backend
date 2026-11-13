@@ -5,6 +5,7 @@ import type { PaginationMeta } from '../../src/shared/api-response.js';
 import type { BookDto } from '../../src/modules/books/book.dto.js';
 import type { PhysicalCopyDto } from '../../src/modules/copies/copy.dto.js';
 import type { StorageLocationDto } from '../../src/modules/locations/location.dto.js';
+import type { NoteDto } from '../../src/modules/notes/note.dto.js';
 import type {
   BookReadingOverviewDto,
   ReadingSessionDto,
@@ -73,6 +74,22 @@ export function readingApiFor(app: Express, accessToken: string) {
   };
 }
 
+export function notesApiFor(app: Express, accessToken: string) {
+  const authorized = authorizedWith(accessToken);
+  return {
+    create: (bookId: string, note: object) =>
+      authorized(request(app).post(`/api/v1/books/${bookId}/notes`)).send(note),
+    listForBook: (bookId: string, query: Record<string, string> | string = {}) =>
+      authorized(request(app).get(`/api/v1/books/${bookId}/notes`)).query(query),
+    listAll: (query: Record<string, string> | string = {}) =>
+      authorized(request(app).get('/api/v1/notes')).query(query),
+    get: (noteId: string) => authorized(request(app).get(`/api/v1/notes/${noteId}`)),
+    update: (noteId: string, changes: object) =>
+      authorized(request(app).patch(`/api/v1/notes/${noteId}`)).send(changes),
+    remove: (noteId: string) => authorized(request(app).delete(`/api/v1/notes/${noteId}`)),
+  };
+}
+
 export async function signInLibraryReader(app: Express) {
   const { user, tokens } = await registerReader(app);
   return {
@@ -82,6 +99,7 @@ export async function signInLibraryReader(app: Express) {
     locations: locationsApiFor(app, tokens.accessToken),
     copies: copiesApiFor(app, tokens.accessToken),
     reading: readingApiFor(app, tokens.accessToken),
+    notes: notesApiFor(app, tokens.accessToken),
   };
 }
 
@@ -99,6 +117,9 @@ export const copiesFrom = (res: { body: unknown }) => dataFrom<PhysicalCopyDto[]
 export const sessionFrom = (res: { body: unknown }) => dataFrom<ReadingSessionDto>(res);
 export const sessionsFrom = (res: { body: unknown }) => dataFrom<ReadingSessionDto[]>(res);
 export const overviewFrom = (res: { body: unknown }) => dataFrom<BookReadingOverviewDto>(res);
+
+export const noteFrom = (res: { body: unknown }) => dataFrom<NoteDto>(res);
+export const notesFrom = (res: { body: unknown }) => dataFrom<NoteDto[]>(res);
 
 export function paginationOf(res: { body: unknown }): PaginationMeta {
   return (res.body as { meta: { pagination: PaginationMeta } }).meta.pagination;
@@ -142,6 +163,14 @@ export function expectNotFound(
   });
 }
 
+/** Field names of a 400 VALIDATION_ERROR response's details, in order. */
+export function invalidFieldsOf(res: { status: number; body: unknown }): string[] {
+  expect(res.status).toBe(400);
+  const { error } = res.body as { error: { code: string; details: { field: string }[] } };
+  expect(error.code).toBe('VALIDATION_ERROR');
+  return error.details.map((detail) => detail.field);
+}
+
 export function startSession(reader: LibraryReader, bookId: string, session: object = {}) {
   return expectCreated<ReadingSessionDto>(reader.reading.start(bookId, session));
 }
@@ -154,4 +183,12 @@ export async function addBookWithLengths(
   return expectCreated<BookDto>(
     reader.books.create({ title: 'Measured Book', format, ...lengths }),
   );
+}
+
+export function addNote(
+  reader: LibraryReader,
+  bookId: string,
+  note: object = { kind: 'note', content: 'A thought' },
+) {
+  return expectCreated<NoteDto>(reader.notes.create(bookId, note));
 }
