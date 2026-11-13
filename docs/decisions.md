@@ -115,3 +115,45 @@ Details and exact responses are in the [API contract](api-contract.md#authentica
   search that is not scoped to one owner.
 - **Title sort uses a lowercased normalized title** in code-point order. Locale-aware collation
   can be added later with a collated index if readers need it.
+- **Request logs keep resource ids, never content.** The request logger records method, URL path
+  (which contains ids such as `/api/v1/books/{id}`), status and request id. Ids are opaque and
+  are what make a "not found" report traceable, so they are logged on purpose. Query strings,
+  headers and bodies are never logged, so titles, search terms, location names, notes and
+  credentials never are.
+- **Private data responses are not cacheable.** `/auth`, `/books`, `/copies` and `/locations`
+  responses send `Cache-Control: no-store` (set before CORS and the body parser so every
+  response is covered), protecting shared computers and back/forward caches. CORS exposes
+  `Location` so browser clients can read the URL of a created resource.
+
+## Physical copy and location decisions
+
+- **A copy is one physical item of a physical book.** Label, condition, storage note and
+  location live on the copy, never on the book. A book can have many copies, and many copies can
+  share a location. Copies of ebooks are refused (`409 BOOK_NOT_PHYSICAL`).
+- **A book with physical-copy history can never become an ebook** (`409
+BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future loans may refer
+  to those copies.
+- **Coordination without transactions.** MongoDB transactions need a replica set; local
+  development and CI use a standalone server. Instead the parent book document is the single
+  coordination point: adding a copy first sets an internal `hasPhysicalCopyHistory: true` on the
+  book with one atomic update that only matches an active physical book owned by the reader, and
+  only then inserts the copy; changing the format to ebook is one atomic update that only matches
+  while that flag is unset. MongoDB applies the two single-document updates in some order, so
+  whichever runs second fails and a copy can never be persisted on an ebook. The flag is never
+  cleared.
+  - **Accepted trade-off:** if the copy insert fails after the flag was set (for example the
+    database becomes unreachable between the two writes), the book stays locked to physical even
+    though it may have no copy. This fails closed (it can only refuse a format change, never
+    allow a wrong one), needs no cleanup to stay correct, and is rare. Switching to multi-document
+    transactions would remove it at the cost of requiring a replica set everywhere.
+- **Deleting a book keeps its copies.** Copy records, including their location, stay unchanged;
+  every copy endpoint hides them while the parent book is deleted. A copy created while its book
+  is being deleted concurrently may be persisted, but it is hidden in the same way.
+- **Copies are soft-deleted** for future lending history; there are no stored lending flags.
+- **Locations are per reader, unique by normalized name** (whitespace collapsed, NFC, lowercased)
+  through a unique index, so concurrent creates and renames cannot produce duplicates. A missing
+  location and another reader's location are indistinguishable.
+- **Locations cannot be deleted yet.** Copies reference them and a safe archive or reassignment
+  policy is not designed; a destructive delete would be misleading.
+- **Unassigned is `null`.** A copy without a location returns `locationId: null`; no default
+  location is invented.

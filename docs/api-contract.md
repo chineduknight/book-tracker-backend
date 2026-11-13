@@ -7,6 +7,9 @@ This document defines shared HTTP behavior. Every implemented endpoint must addi
 - Base path: `/api/v1`.
 - JSON responses use `Content-Type: application/json`; `204 No Content` has no body.
 - All responses include an `X-Request-Id` header. Error responses also include `requestId` in the body if one was assigned.
+- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies` and `/api/v1/locations` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
+- CORS exposes `X-Request-Id` and `Location` to allowed browser origins.
+- **Logging:** request logs contain the method, the URL path (which includes resource ids such as `/api/v1/books/{id}`), the status and the request id. Query strings, headers and bodies are never logged, so titles, search terms, location names, notes, emails, passwords and tokens never reach the logs.
 - Public IDs are strings named `id`, not MongoDB `_id`; never return `__v` or internal model fields.
 - Timestamps use ISO 8601 UTC strings, e.g. `2026-11-13T10:30:00.000Z`. Calendar-only dates such as a loan due date use `YYYY-MM-DD` with an explicit business timezone policy; do not shift a date-only value by implicit UTC conversion.
 - Do not expose password hashes, tokens (outside explicitly designed authentication responses), personal borrower details to unrelated users, stack traces, or internal database errors.
@@ -76,18 +79,18 @@ Every error uses the established envelope:
 
 `details` is optional, contains only safe field-level feedback, and must not expose credentials, database messages, or input secrets. Known error bodies use a safe, stable `code` and human-readable `message`.
 
-| Status                       | Intended use                                                                   | Example code                                                      |
-| ---------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                        | `VALIDATION_ERROR`, `INVALID_JSON`                                |
-| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh           | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN` |
-| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership | `FORBIDDEN`                                                       |
-| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else             | `NOT_FOUND`                                                       |
-| `409 Conflict`               | Duplicate resource or an active-loan uniqueness conflict                       | `CONFLICT`                                                        |
-| `413 Payload Too Large`      | Body exceeds configured limit                                                  | `PAYLOAD_TOO_LARGE`                                               |
-| `415 Unsupported Media Type` | Unsupported request encoding                                                   | `UNSUPPORTED_MEDIA_TYPE`                                          |
-| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                 | `RATE_LIMITED`                                                    |
-| `500 Internal Server Error`  | Unexpected server fault                                                        | `INTERNAL_ERROR`                                                  |
-| `503 Service Unavailable`    | Not ready, including disconnected database                                     | `SERVICE_UNAVAILABLE`                                             |
+| Status                       | Intended use                                                                    | Example code                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                |
+| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN` |
+| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                       |
+| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                       |
+| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`       |
+| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                               |
+| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                          |
+| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                    |
+| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                  |
+| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                             |
 
 Do not change existing implemented error codes merely to match these suggested names; preserve current behavior or propose an explicit breaking-change decision. Avoid `200` responses that represent errors inside `data`.
 
@@ -220,14 +223,14 @@ interface DuplicateSuggestionDto {
 
 Optional fields that are unset are **omitted** from responses (never `null`).
 
-| Method   | Path                            | Request                | Success                                                                                             | Errors                                         |
-| -------- | ------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `POST`   | `/api/v1/books`                 | Body: book fields      | `201` `{ "data": BookDto }`, `Location: /api/v1/books/{id}`                                         | `400 VALIDATION_ERROR`, `401`                  |
-| `GET`    | `/api/v1/books`                 | Query: list parameters | `200` `{ "data": BookDto[], "meta": { "pagination": { "page", "limit", "total", "totalPages" } } }` | `400 VALIDATION_ERROR`, `401`                  |
-| `GET`    | `/api/v1/books/duplicate-check` | Query: `title`, `isbn` | `200` `{ "data": { "matches": DuplicateSuggestionDto[] } }`                                         | `400 VALIDATION_ERROR`, `401`                  |
-| `GET`    | `/api/v1/books/:bookId`         | —                      | `200` `{ "data": BookDto }`                                                                         | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` |
-| `PATCH`  | `/api/v1/books/:bookId`         | Body: fields to change | `200` `{ "data": BookDto }`                                                                         | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` |
-| `DELETE` | `/api/v1/books/:bookId`         | —                      | `204`, empty body                                                                                   | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` |
+| Method   | Path                            | Request                | Success                                                                                             | Errors                                                                         |
+| -------- | ------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `POST`   | `/api/v1/books`                 | Body: book fields      | `201` `{ "data": BookDto }`, `Location: /api/v1/books/{id}`                                         | `400 VALIDATION_ERROR`, `401`                                                  |
+| `GET`    | `/api/v1/books`                 | Query: list parameters | `200` `{ "data": BookDto[], "meta": { "pagination": { "page", "limit", "total", "totalPages" } } }` | `400 VALIDATION_ERROR`, `401`                                                  |
+| `GET`    | `/api/v1/books/duplicate-check` | Query: `title`, `isbn` | `200` `{ "data": { "matches": DuplicateSuggestionDto[] } }`                                         | `400 VALIDATION_ERROR`, `401`                                                  |
+| `GET`    | `/api/v1/books/:bookId`         | —                      | `200` `{ "data": BookDto }`                                                                         | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                 |
+| `PATCH`  | `/api/v1/books/:bookId`         | Body: fields to change | `200` `{ "data": BookDto }`                                                                         | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`, `409 BOOK_HAS_PHYSICAL_COPIES` |
+| `DELETE` | `/api/v1/books/:bookId`         | —                      | `204`, empty body                                                                                   | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                 |
 
 `401` is the standard `UNAUTHENTICATED` response with `WWW-Authenticate: Bearer`.
 
@@ -268,9 +271,73 @@ Empty optional strings (blank after trimming) are rejected rather than stored; o
 
 **Identifiers and not-found:** a `bookId` that is not 24 hexadecimal characters fails with `400 VALIDATION_ERROR` and detail `{ "field": "bookId", "message": "must be a 24-character hexadecimal id" }`. A well-formed id that does not exist, was deleted or belongs to another reader returns the identical `404 { "error": { "code": "NOT_FOUND", "message": "Book not found", "requestId": "<id>" } }`.
 
-**Deletion is soft:** `DELETE` marks the book deleted and returns `204`. The book then behaves as missing everywhere (get, update, list, search, duplicate check, repeated delete gives `404`). Its record is kept so that later reading history, notes, copies and loans are never destroyed; there is no restore or purge endpoint yet.
+**Deletion is soft:** `DELETE` marks the book deleted and returns `204`. The book then behaves as missing everywhere (get, update, list, search, duplicate check, repeated delete gives `404`). Its record is kept so that later reading history, notes, copies and loans are never destroyed; there is no restore or purge endpoint yet. Its physical copies are kept unchanged (including their locations) and are hidden by every copy endpoint while the book is deleted.
+
+**Format changes and physical copies:** `PATCH` with `"format": "ebook"` fails with `409 { "error": { "code": "BOOK_HAS_PHYSICAL_COPIES", "message": "A book with physical copies cannot become an ebook", "requestId": "<id>" } }` if the book has, or ever had, a physical copy (deleted copies count, because future loans may reference them). Nothing in the request is applied. Books without copy history can change format freely. Another reader's book still gives `404`.
 
 **Reading status** is not part of a book. Books without reading sessions will be treated as unread by the future reading module.
+
+### Locations
+
+A storage location is a named place where a reader keeps physical copies (`Home`, `Office`, `Study Shelf`). Locations belong to one reader. Every endpoint requires a bearer access token. DTO: `src/modules/locations/location.dto.ts`. Bruno: `bruno/Locations/`.
+
+```ts
+interface StorageLocationDto {
+  id: string; // 24-character lowercase hex
+  name: string;
+  description?: string; // omitted when unset
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC
+}
+```
+
+| Method  | Path                            | Request                                                | Success                                                                    | Errors                                                         |
+| ------- | ------------------------------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `POST`  | `/api/v1/locations`             | `{ name, description? }`                               | `201` `{ "data": StorageLocationDto }`, `Location: /api/v1/locations/{id}` | `400 VALIDATION_ERROR`, `401`, `409 CONFLICT`                  |
+| `GET`   | `/api/v1/locations`             | Query: `page` (default 1), `limit` (1–100, default 20) | `200` `{ "data": StorageLocationDto[], "meta": { "pagination" } }`         | `400 VALIDATION_ERROR`, `401`                                  |
+| `GET`   | `/api/v1/locations/:locationId` | —                                                      | `200` `{ "data": StorageLocationDto }`                                     | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                 |
+| `PATCH` | `/api/v1/locations/:locationId` | `{ name?, description? }`, at least one                | `200` `{ "data": StorageLocationDto }`                                     | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`, `409 CONFLICT` |
+
+- **Fields (strict; `ownerId`, `normalizedName` and any other field are rejected as `Unknown field`):** `name` is trimmed with inner whitespace collapsed, 1–100 characters, and cannot be `null`. `description` is trimmed, 1–500 characters; on PATCH `null` clears it. Blank optional strings are rejected.
+- **Unique names per reader:** names are compared after collapsing whitespace, Unicode NFC composition and lowercasing, enforced by a unique database index (so concurrent requests cannot create duplicates). A clash returns `409 { "error": { "code": "CONFLICT", "message": "A location with this name already exists", "requestId": "<id>" } }`. Different readers may use the same name, and renaming a location to a different capitalisation of its own name is allowed.
+- **Ordering:** alphabetical by the case-insensitive name (Unicode code-point order), then `id`. Only `page` and `limit` are accepted.
+- **Not found:** a missing location and another reader's location both return `404 { "error": { "code": "NOT_FOUND", "message": "Location not found", "requestId": "<id>" } }`; a malformed id gives `400` with a `locationId` detail.
+- **No deletion yet:** there is deliberately no `DELETE` endpoint (it returns `404 Route not found`). Copies may reference a location, and removing or hiding one needs a reassignment and history policy that is not designed yet.
+
+### Physical copies
+
+A physical copy is one specific item of a reader's **physical** book, with its own label, condition, storage note and optional location. Several copies of one book, and copies of different books, may share a location. Ebooks never have copies. DTO: `src/modules/copies/copy.dto.ts`. Bruno: `bruno/Copies/`.
+
+```ts
+type PhysicalCopyCondition = 'new' | 'like_new' | 'good' | 'fair' | 'poor';
+
+interface PhysicalCopyDto {
+  id: string;
+  bookId: string;
+  locationId: string | null; // null when unassigned
+  label?: string; // omitted when unset
+  condition?: PhysicalCopyCondition; // omitted means not assessed
+  storageNote?: string; // omitted when unset
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC
+}
+```
+
+| Method   | Path                           | Request                                                             | Success                                                              | Errors                                                                                     |
+| -------- | ------------------------------ | ------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `POST`   | `/api/v1/books/:bookId/copies` | `{ label?, condition?, storageNote?, locationId? }` (body optional) | `201` `{ "data": PhysicalCopyDto }`, `Location: /api/v1/copies/{id}` | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` (book or location), `409 BOOK_NOT_PHYSICAL` |
+| `GET`    | `/api/v1/books/:bookId/copies` | Query: `page`, `limit`, `locationId?`, `condition?`                 | `200` `{ "data": PhysicalCopyDto[], "meta": { "pagination" } }`      | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` (book or location)                          |
+| `GET`    | `/api/v1/copies/:copyId`       | —                                                                   | `200` `{ "data": PhysicalCopyDto }`                                  | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                             |
+| `PATCH`  | `/api/v1/copies/:copyId`       | `{ label?, condition?, storageNote?, locationId? }`, at least one   | `200` `{ "data": PhysicalCopyDto }`                                  | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` (copy or location)                          |
+| `DELETE` | `/api/v1/copies/:copyId`       | —                                                                   | `204`, empty body                                                    | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                             |
+
+- **Fields (strict):** `label` trimmed 1–100; `condition` one of the five values; `storageNote` trimmed 1–500; `locationId` a 24-character hex id of one of the reader's locations, or `null`. `ownerId`, `userId`, `bookId`, `_id`, `deletedAt`, `isOnLoan`, `isAvailable` and any other field are rejected as `Unknown field`; a copy can never be moved to another book or reader. Blank strings are rejected. On create every field may be omitted (an empty or missing body creates an unassigned, unlabelled copy) and `locationId` may be `null`. On PATCH an omitted field is unchanged and `null` clears it (`locationId: null` unassigns the copy); an empty body is rejected.
+- **Parent book:** creating requires one of the reader's active books. A missing, deleted or foreign book (including another reader's ebook) returns `404 "Book not found"`; the reader's own ebook returns `409 { "error": { "code": "BOOK_NOT_PHYSICAL", "message": "Physical copies can only be added to physical books", "requestId": "<id>" } }`. Listing copies of the reader's own ebook returns an empty page.
+- **Locations:** any `locationId` (body or list filter) must be one of the reader's locations; a missing or foreign location gives `404 "Location not found"` without saying which.
+- **Listing:** newest first, `id` as tie-breaker. `page` ≥ 1 (default 1), `limit` 1–100 (default 20), optional `locationId` and `condition` filters (applied to `total` too); each parameter at most once, others rejected. Filtering for unassigned copies is not supported yet.
+- **Visibility:** a copy is visible only while it and its parent book are both active. Copies of a deleted book return `404 "Copy not found"` from get, update and delete, and listing a deleted book's copies returns `404 "Book not found"`.
+- **Deletion is soft:** `DELETE` marks the copy deleted and returns `204`; it then behaves as missing everywhere, and a repeated delete returns `404`. The record is kept for future lending history.
+- **No lending status:** there is no `isAvailable` or `isOnLoan`; availability will be derived from active loans.
 
 ### Responses on any path
 

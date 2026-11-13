@@ -116,6 +116,15 @@ preflight and request-body errors.
 | GET    | `/api/v1/books/:bookId`         | One of the reader's books                                    |
 | PATCH  | `/api/v1/books/:bookId`         | Change fields; `null` clears an optional field               |
 | DELETE | `/api/v1/books/:bookId`         | Soft-delete a book (204)                                     |
+| POST   | `/api/v1/locations`             | Create a named storage location (201 + `Location`)           |
+| GET    | `/api/v1/locations`             | List the reader's locations alphabetically (paginated)       |
+| GET    | `/api/v1/locations/:locationId` | One of the reader's locations                                |
+| PATCH  | `/api/v1/locations/:locationId` | Rename a location or change/clear its description            |
+| POST   | `/api/v1/books/:bookId/copies`  | Add a physical copy to a physical book (201 + `Location`)    |
+| GET    | `/api/v1/books/:bookId/copies`  | List a book's copies, filter by location or condition        |
+| GET    | `/api/v1/copies/:copyId`        | One physical copy                                            |
+| PATCH  | `/api/v1/copies/:copyId`        | Change label, condition, note or location; `null` clears     |
+| DELETE | `/api/v1/copies/:copyId`        | Soft-delete a copy (204)                                     |
 
 Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
 token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
@@ -137,6 +146,8 @@ src/
 ├── middleware/            # request id + logging, 404 and centralised error handling
 ├── modules/auth/          # register, login, sessions, tokens, rate limits, auth middleware
 ├── modules/books/         # book catalogue: model, schemas, DTOs, service, routes
+├── modules/copies/        # physical copies of physical books
+├── modules/locations/     # reader-owned storage locations
 ├── modules/health/        # liveness and readiness routes + response DTOs
 ├── modules/users/         # user model, public UserDto, user service
 └── shared/                # AppError, response envelopes, request validation, safe errors
@@ -170,15 +181,14 @@ Included: scaffold, config validation, MongoDB lifecycle, health/readiness, secu
 (helmet, CORS allowlist, 100 kB JSON limit), structured logging with redaction, error handling,
 authentication and user accounts (register, login, refresh, logout, current user), the private
 book catalogue (create, list, search, filter, sort, update, soft delete, duplicate suggestions),
-tests, CI, Bruno.
+storage locations and physical copies, tests, CI, Bruno.
 
-Not included yet: email verification, password reset, OAuth, copy/reading/note/loan endpoints,
-book restore, UI, deployment.
+Not included yet: email verification, password reset, OAuth, reading/note/loan endpoints, book
+restore, location deletion, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Copies**: physical copies per title with locations.
-2. **Reading sessions**: reads and rereads with optional completion date, rating and summary.
-3. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
-4. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
-5. **Export**: full per-user data export.
+1. **Reading sessions**: reads and rereads with optional completion date, rating and summary.
+2. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
+3. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
+4. **Export**: full per-user data export.

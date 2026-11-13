@@ -71,6 +71,27 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 
   The integration tests assert, with `explain`, that each query shape uses its index.
 
+## Locations and physical copies
+
+- `modules/locations` owns the `locations` collection and exposes
+  `requireLocationOwnedByUser` for other modules. Unique index `owner_unique_name`
+  `{ ownerId: 1, normalizedName: 1 }` enforces per-reader names and serves the alphabetical list.
+- `modules/copies` owns the `physicalcopies` collection and serves both `/books/:bookId/copies`
+  and `/copies/:copyId` from one router, mounted before the books router so book-scoped copy
+  routes are handled once. It never reads the books or locations collections directly: it calls
+  `reserveBookForPhysicalCopy`, `isActiveBookOwnedByUser` and `requireActiveBookOwnedByUser`
+  from the books service and `requireLocationOwnedByUser` from the locations service.
+- A copy is visible only when `{ _id, ownerId, deletedAt: null }` matches **and** its parent
+  book is active and owned by the reader; single-copy writes are atomic updates with the same
+  copy filter after that visibility check.
+- Copy indexes: `owner_book_active_recent`
+  `{ ownerId: 1, bookId: 1, deletedAt: 1, createdAt: -1, _id: -1 }` for a book's copies (with
+  optional location/condition filters applied on top), and `owner_location_active`
+  `{ ownerId: 1, locationId: 1, deletedAt: 1 }` for future location views. Neither is unique.
+- **Book/copy coordination:** see [decisions.md](decisions.md#physical-copy-and-location-decisions).
+  The book document's internal `hasPhysicalCopyHistory` flag is the single point that copy
+  creation and the ebook format change both update atomically.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
@@ -83,8 +104,8 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 
 ## Future data model (design notes, not implemented)
 
-`User`, `Session`, `RefreshToken` and `Book` exist (see above); the remaining models are design
-notes.
+`User`, `Session`, `RefreshToken`, `Book`, `StorageLocation` and `PhysicalCopy` exist (see
+above); the remaining models are design notes.
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)
