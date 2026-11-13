@@ -20,7 +20,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "api:test": "cd bruno && npx --yes @usebruno/cli@4.3.0 run --env local"
+    "api:test": "cd bruno && npx --yes @usebruno/cli@4.3.0 run --env local",
+    "api:smoke": "npm run build && tsx scripts/api-smoke.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",
