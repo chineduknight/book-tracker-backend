@@ -59,11 +59,25 @@ deliberately logs out, so each folder runs reliably on its own or as part of the
 ## Repeatable runs: `npm run api:smoke`
 
 `npm run api:smoke` is the recommended way to run the whole collection repeatedly. It builds the
-API, drops and recreates only the dedicated `book-tracker-smoke` database (it refuses any other
-database name), starts a fresh API on port 3100 with a generated signing secret, runs the whole
-collection against it and stops the API. Every run therefore starts from a clean state with fresh
-in-memory rate limits, so repeated runs never hit the per-address registration limit and the
-limits themselves stay unchanged. CI runs the same command.
+API, drops and recreates only the dedicated `book-tracker-smoke` database, starts a fresh API on
+port 3100 with a generated signing secret, runs the whole collection against it and stops the API.
+Every run therefore starts from a clean state with fresh in-memory rate limits, so repeated runs
+never hit the per-address registration limit and the limits themselves stay unchanged. CI runs the
+same command.
+
+Because it deletes data, the runner fails before connecting to anything unless:
+
+- `MONGODB_SMOKE_URI` is a plain `mongodb://` URI with exactly one local host (`127.0.0.1`,
+  `localhost` or `[::1]`), the `book-tracker-smoke` database and only harmless options
+  (`appName`, `authMechanism`, `authSource`, `connectTimeoutMS`, `directConnection`,
+  `serverSelectionTimeoutMS`). `mongodb+srv://`, remote or multiple hosts, replica-set discovery
+  and proxies are refused, and both the reset and the API use `directConnection=true`. There is no
+  remote opt-in.
+- `SMOKE_PORT` is free. A port that is already in use stops the run before the reset, and Bruno
+  only starts after the API process this run started reports that it is listening on that port.
+
+Failures print only the runner's own messages or an error's name and code, never connection
+strings.
 
 ```bash
 npm run api:smoke

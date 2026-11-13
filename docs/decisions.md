@@ -199,3 +199,8 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
   dedicated `book-tracker-smoke` database, starts the API on its own port with a generated signing
   secret, runs the whole Bruno collection and stops the API. Each run therefore starts with fresh
   in-memory rate limits, without weakening the limits themselves. CI uses the same script.
+  Because it drops a database, it only accepts a single local `mongodb://` host with the smoke
+  database and an allowlist of options (no SRV, remote hosts, replica-set discovery or proxies;
+  `directConnection=true` is enforced), refuses a busy port before resetting anything, waits for
+  the API process it started to report listening before trusting `/ready`, and prints only safe
+  error names and codes.
