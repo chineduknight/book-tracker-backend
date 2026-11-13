@@ -10,10 +10,15 @@ import { createAuthenticationMiddleware } from './modules/auth/auth.middleware.j
 import { DEFAULT_AUTH_RATE_LIMITS, type AuthRateLimits } from './modules/auth/auth.rate-limits.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createBooksRouter } from './modules/books/book.routes.js';
+import { createCopiesRouter } from './modules/copies/copy.routes.js';
+import { createLocationsRouter } from './modules/locations/location.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
 export const API_PREFIX = '/api/v1';
 const AUTH_PATH = '/auth';
+const PRIVATE_DATA_PATHS = [AUTH_PATH, '/books', '/copies', '/locations'].map(
+  (path) => `${API_PREFIX}${path}`,
+);
 export const JSON_BODY_LIMIT = '100kb';
 
 export interface AppOptions {
@@ -36,14 +41,14 @@ export function createApp({
 
   app.use(requestLogger(logger));
   // Before CORS and the body parser, so preflight and body-parsing errors are covered too.
-  app.use(`${API_PREFIX}${AUTH_PATH}`, preventResponseCaching);
+  app.use(PRIVATE_DATA_PATHS, preventResponseCaching);
   app.use(helmet());
   app.use(
     cors({
       origin: [...corsOrigins],
       methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization', REQUEST_ID_HEADER],
-      exposedHeaders: [REQUEST_ID_HEADER],
+      exposedHeaders: [REQUEST_ID_HEADER, 'Location'],
       credentials: false,
       maxAge: 600,
     }),
@@ -59,7 +64,9 @@ export function createApp({
     AUTH_PATH,
     createAuthRouter({ accessTokens, requireAuthenticatedUser, rateLimits: authRateLimits }),
   );
+  api.use(createCopiesRouter({ requireAuthenticatedUser }));
   api.use('/books', createBooksRouter({ requireAuthenticatedUser }));
+  api.use('/locations', createLocationsRouter({ requireAuthenticatedUser }));
   app.use(API_PREFIX, api);
 
   app.use(notFoundHandler);

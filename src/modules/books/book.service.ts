@@ -1,4 +1,4 @@
-import type { PaginationMeta } from '../../shared/api-response.js';
+import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
 import { AppError } from '../../shared/errors.js';
 import { toPublicBook, type BookDto, type DuplicateSuggestionDto } from './book.dto.js';
 import { BookModel } from './book.model.js';
@@ -39,6 +39,47 @@ function activeBooksOwnedBy(ownerId: string) {
 
 function activeBookOwnedBy(ownerId: string, bookId: string) {
   return { ...activeBooksOwnedBy(ownerId), _id: bookId };
+}
+
+function bookHasPhysicalCopiesError(): AppError {
+  return new AppError(
+    409,
+    'BOOK_HAS_PHYSICAL_COPIES',
+    'A book with physical copies cannot become an ebook',
+  );
+}
+
+function bookNotPhysicalError(): AppError {
+  return new AppError(
+    409,
+    'BOOK_NOT_PHYSICAL',
+    'Physical copies can only be added to physical books',
+  );
+}
+
+export async function isActiveBookOwnedByUser(ownerId: string, bookId: string): Promise<boolean> {
+  return (await BookModel.exists(activeBookOwnedBy(ownerId, bookId))) !== null;
+}
+
+/*
+ * Copy creation and the ebook format change coordinate through this single book document:
+ * reserving sets hasPhysicalCopyHistory only while the book is physical, and the ebook change
+ * only succeeds while the flag is unset. MongoDB applies both writes atomically to one document,
+ * so whichever runs second fails and no copy can end up on an ebook.
+ */
+export async function reserveBookForPhysicalCopy(ownerId: string, bookId: string): Promise<void> {
+  const { matchedCount } = await BookModel.updateOne(
+    { ...activeBookOwnedBy(ownerId, bookId), format: 'physical' },
+    { $set: { hasPhysicalCopyHistory: true } },
+    { timestamps: false },
+  );
+  if (matchedCount === 1) return;
+  if (await isActiveBookOwnedByUser(ownerId, bookId)) throw bookNotPhysicalError();
+  throw bookNotFoundError();
+}
+
+export async function requireActiveBookOwnedByUser(ownerId: string, bookId: string) {
+  if (!(await isActiveBookOwnedByUser(ownerId, bookId))) throw bookNotFoundError();
 }
 
 function toBookUpdate(changes: BookChanges) {
@@ -97,7 +138,7 @@ export async function listBooksOwnedByUser(
 
   return {
     books: books.map(toPublicBook),
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    pagination: toPaginationMeta(page, limit, total),
   };
 }
 
@@ -106,13 +147,20 @@ export async function updateBookOwnedByUser(
   bookId: string,
   changes: BookChanges,
 ): Promise<BookDto> {
+  const becomesEbook = changes.format === 'ebook';
   const book = await BookModel.findOneAndUpdate(
-    activeBookOwnedBy(ownerId, bookId),
+    {
+      ...activeBookOwnedBy(ownerId, bookId),
+      ...(becomesEbook && { hasPhysicalCopyHistory: { $ne: true } }),
+    },
     toBookUpdate(changes),
     { returnDocument: 'after', runValidators: true },
   ).lean();
-  if (!book) throw bookNotFoundError();
-  return toPublicBook(book);
+  if (book) return toPublicBook(book);
+  if (becomesEbook && (await isActiveBookOwnedByUser(ownerId, bookId))) {
+    throw bookHasPhysicalCopiesError();
+  }
+  throw bookNotFoundError();
 }
 
 export async function deleteBookOwnedByUser(ownerId: string, bookId: string): Promise<void> {
