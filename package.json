@@ -19,12 +19,16 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "api:test": "cd bruno && npx --yes @usebruno/cli@4.3.0 run --env local"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.2.2",
     "cors": "^2.8.6",
     "express": "^5.3.0",
+    "express-rate-limit": "^8.7.4",
     "helmet": "^8.3.0",
+    "jose": "^6.2.17",
     "mongoose": "^9.12.1",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",

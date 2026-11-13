@@ -50,8 +50,14 @@ cluster you create yourself).
 nvm use                 # Node 26.x; npm enforces this via engine-strict
 npm ci
 cp .env.example .env    # adjust MONGODB_URI if needed
+# Generate the access-token signing secret straight into .env (it is never printed):
+echo "JWT_ACCESS_TOKEN_SECRET=$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))")" >> .env
 npm run dev             # http://localhost:3000/api/v1/health
 ```
+
+`.env.example` leaves `JWT_ACCESS_TOKEN_SECRET` empty on purpose, so the API refuses to start
+until you generate one; there is no built-in fallback secret. The appended line overrides the
+empty one (the last value in an env file wins).
 
 The server starts even if MongoDB is unreachable: `/health` responds immediately and `/ready`
 returns 503 until a connection is established (connection attempts are retried every 5s).
@@ -61,28 +67,31 @@ returns 503 until a connection is established (connection attempts are retried e
 Validated with Zod at startup. Invalid configuration aborts with a list of offending variable
 names; values are never printed.
 
-| Variable      | Required | Default                 | Notes                                                        |
-| ------------- | -------- | ----------------------- | ------------------------------------------------------------ |
-| `MONGODB_URI` | yes      | —                       | `mongodb://` or `mongodb+srv://`. Keep credentials in `.env` |
-| `NODE_ENV`    | no       | `development`           | `development` \| `test` \| `production`                      |
-| `PORT`        | no       | `3000`                  | 1–65535                                                      |
-| `CORS_ORIGIN` | no       | `http://localhost:5173` | Comma-separated exact origins. `*` is rejected               |
-| `LOG_LEVEL`   | no       | `info`                  | `fatal` `error` `warn` `info` `debug` `trace` `silent`       |
+| Variable                  | Required          | Default                 | Notes                                                                                                 |
+| ------------------------- | ----------------- | ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| `MONGODB_URI`             | yes               | —                       | `mongodb://` or `mongodb+srv://`. Keep credentials in `.env`                                          |
+| `NODE_ENV`                | no                | `development`           | `development` \| `test` \| `production`                                                               |
+| `PORT`                    | no                | `3000`                  | 1–65535                                                                                               |
+| `CORS_ORIGIN`             | no                | `http://localhost:5173` | Comma-separated exact origins. `*` is rejected                                                        |
+| `LOG_LEVEL`               | no                | `info`                  | `fatal` `error` `warn` `info` `debug` `trace` `silent`                                                |
+| `JWT_ACCESS_TOKEN_SECRET` | yes               | —                       | Signs access tokens. base64url, at least 32 random bytes; see Getting started                         |
+| `MONGODB_TEST_URI`        | integration tests | —                       | e.g. `mongodb://127.0.0.1:27017/book-tracker-test`; tests always use the `book-tracker-test` database |
 
 `.env` and other `.env.*` files are git-ignored; only `.env.example` (fake values) is committed.
 
 ## Scripts
 
-| Command             | What it does                                                        |
-| ------------------- | ------------------------------------------------------------------- |
-| `npm run dev`       | Watch mode via `tsx`, loads `.env`, pretty logs                     |
-| `npm run build`     | Compile `src/` → `dist/` with `tsc`                                 |
-| `npm start`         | Run the compiled server (`dist/server.js`), loads `.env` if present |
-| `npm run typecheck` | Type-check sources, tests and configs                               |
-| `npm run lint`      | ESLint                                                              |
-| `npm run format`    | Prettier write (`format:check` to verify)                           |
-| `npm test`          | Vitest suite (`test:watch` for watch mode)                          |
-| `npm run api:test`  | Run the Bruno collection against the local API                      |
+| Command                    | What it does                                                           |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `npm run dev`              | Watch mode via `tsx`, loads `.env`, pretty logs                        |
+| `npm run build`            | Compile `src/` → `dist/` with `tsc`                                    |
+| `npm start`                | Run the compiled server (`dist/server.js`), loads `.env` if present    |
+| `npm run typecheck`        | Type-check sources, tests and configs                                  |
+| `npm run lint`             | ESLint                                                                 |
+| `npm run format`           | Prettier write (`format:check` to verify)                              |
+| `npm test`                 | Unit and HTTP tests without a database (`test:watch` for watch mode)   |
+| `npm run test:integration` | MongoDB-backed tests; requires `MONGODB_TEST_URI` and fails without it |
+| `npm run api:test`         | Run the Bruno collection against the local API                         |
 
 ## API
 
@@ -92,10 +101,19 @@ All routes are under `/api/v1`. Success bodies are `{ "data": ... }`; errors are
 The [API contract](docs/api-contract.md) lists every status and body, including `HEAD`, CORS
 preflight and request-body errors.
 
-| Method | Path             | Purpose                                                 |
-| ------ | ---------------- | ------------------------------------------------------- |
-| GET    | `/api/v1/health` | Liveness. Always 200 while the process serves HTTP      |
-| GET    | `/api/v1/ready`  | Readiness. 200 when MongoDB is connected, otherwise 503 |
+| Method | Path                    | Purpose                                                 |
+| ------ | ----------------------- | ------------------------------------------------------- |
+| GET    | `/api/v1/health`        | Liveness. Always 200 while the process serves HTTP      |
+| GET    | `/api/v1/ready`         | Readiness. 200 when MongoDB is connected, otherwise 503 |
+| POST   | `/api/v1/auth/register` | Create an account and start a session (201)             |
+| POST   | `/api/v1/auth/login`    | Start a session with email and password                 |
+| POST   | `/api/v1/auth/refresh`  | Exchange a refresh token for a new token pair           |
+| POST   | `/api/v1/auth/logout`   | Revoke the session that owns a refresh token (204)      |
+| GET    | `/api/v1/auth/me`       | The authenticated user (bearer access token)            |
+
+Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
+token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
+see [docs/decisions.md](docs/decisions.md#authentication-decisions).
 
 Executable examples live in the [Bruno collection](bruno/README.md):
 open `bruno/` in the Bruno app and select the `local` environment, or run `npm run api:test`.
@@ -111,9 +129,12 @@ src/
 ├── config/                # env.ts (Zod-validated env), logger.ts (pino + redaction)
 ├── db/                    # mongo.ts (connect with retry, readiness, disconnect)
 ├── middleware/            # request id + logging, 404 and centralised error handling
+├── modules/auth/          # register, login, sessions, tokens, rate limits, auth middleware
 ├── modules/health/        # liveness and readiness routes + response DTOs
-└── shared/                # AppError, response envelope types, safe error serializer
-test/                      # Vitest + Supertest; MongoDB is mocked
+├── modules/users/         # user model, public UserDto, user service
+└── shared/                # AppError, response envelopes, request validation, safe errors
+test/                      # Vitest + Supertest without a database
+test/integration/          # Vitest + Supertest against a real MongoDB (book-tracker-test)
 bruno/                     # Bruno collection (API docs + executable examples)
 docs/                      # architecture, product invariants, API contract
 AGENTS.md                  # engineering standards (CLAUDE.md imports it)
@@ -121,22 +142,37 @@ AGENTS.md                  # engineering standards (CLAUDE.md imports it)
 
 See [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md).
 
+## Running the integration tests
+
+The integration suite needs a MongoDB server. It connects to the `book-tracker-test` database
+whatever the URI names, and deletes users and sessions between tests, so never point it at data
+you want to keep.
+
+```bash
+MONGODB_TEST_URI=mongodb://127.0.0.1:27017/book-tracker-test npm run test:integration
+```
+
+No local MongoDB? A throwaway container works:
+`docker run --rm -d -p 27017:27017 --name book-tracker-test-mongo mongo:8.0`.
+CI runs the same suite against a `mongo:8.0` service container, then starts the built API and
+runs the Bruno collection against it.
+
 ## Current scope
 
 Included: scaffold, config validation, MongoDB lifecycle, health/readiness, security baseline
 (helmet, CORS allowlist, 100 kB JSON limit), structured logging with redaction, error handling,
-tests, CI, Bruno.
+authentication and user accounts (register, login, refresh, logout, current user), tests, CI,
+Bruno.
 
-Not included yet: authentication, any book/copy/reading/note/loan endpoints, Mongoose models,
-UI, deployment.
+Not included yet: email verification, password reset, OAuth, any book/copy/reading/note/loan
+endpoints, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Auth & users**: registration/login, password hashing, JWT, owner-scoping middleware.
-2. **Books (titles)**: owner-scoped catalogue CRUD, formats including ebook catalogue entries,
+1. **Books (titles)**: owner-scoped catalogue CRUD, formats including ebook catalogue entries,
    external cover URLs.
-3. **Copies**: physical copies per title with locations.
-4. **Reading sessions**: reads and rereads with optional completion date, rating and summary.
-5. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
-6. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
-7. **Export**: full per-user data export.
+2. **Copies**: physical copies per title with locations.
+3. **Reading sessions**: reads and rereads with optional completion date, rating and summary.
+4. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
+5. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
+6. **Export**: full per-user data export.

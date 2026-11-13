@@ -13,6 +13,14 @@ function isHttpOrigin(value: string): boolean {
   }
 }
 
+const BASE64URL = /^[A-Za-z0-9_-]+$/;
+const MINIMUM_SECRET_BYTES = 32;
+const MINIMUM_DISTINCT_SECRET_BYTES = 16;
+
+function looksRandomlyGenerated(secret: Buffer): boolean {
+  return new Set(secret).size >= MINIMUM_DISTINCT_SECRET_BYTES;
+}
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
@@ -46,6 +54,17 @@ const envSchema = z.object({
         .min(1, 'must list at least one origin'),
     ),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+  JWT_ACCESS_TOKEN_SECRET: z
+    .string({ error: 'is required' })
+    .trim()
+    .min(1, 'is required')
+    .regex(BASE64URL, 'must be base64url-encoded')
+    .transform((encoded) => Buffer.from(encoded, 'base64url'))
+    .refine(
+      (secret) => secret.length >= MINIMUM_SECRET_BYTES,
+      'must decode to at least 32 bytes (256 bits)',
+    )
+    .refine(looksRandomlyGenerated, 'must be randomly generated'),
 });
 
 export type Env = z.infer<typeof envSchema>;

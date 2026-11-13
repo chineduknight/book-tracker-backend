@@ -1,0 +1,43 @@
+meta {
+  name: Register invalid body
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno Reader",
+    "email": "not-an-email",
+    "password": "too-short",
+    "role": "admin"
+  }
+}
+
+tests {
+  test("returns 400 VALIDATION_ERROR with field details", function () {
+    expect(res.getStatus()).to.equal(400);
+    const { error } = res.getBody();
+    expect(error.code).to.equal("VALIDATION_ERROR");
+    expect(error.message).to.equal("The request contains invalid fields");
+    expect(error.details.map((detail) => detail.field)).to.have.members([
+      "role", "email", "password",
+    ]);
+  });
+
+  test("never echoes supplied values", function () {
+    const text = JSON.stringify(res.getBody());
+    expect(text).to.not.include("too-short");
+    expect(text).to.not.include("not-an-email");
+  });
+}
+
+docs {
+  `details` lists `{ "field", "message" }` pairs. Messages describe the rule broken and never
+  include the submitted value. Unknown fields are reported as `Unknown field`.
+}

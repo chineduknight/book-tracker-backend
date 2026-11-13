@@ -62,6 +62,14 @@ export async function connectWithRetry(uri: string, options: ConnectOptions): Pr
   return false;
 }
 
+const DUPLICATE_KEY_ERROR_CODE = 11000;
+
+export function isDuplicateKeyError(error: unknown): boolean {
+  return (
+    error instanceof mongoose.mongo.MongoServerError && error.code === DUPLICATE_KEY_ERROR_CODE
+  );
+}
+
 export async function disconnectFromDatabase(): Promise<void> {
   await mongoose.disconnect();
 }

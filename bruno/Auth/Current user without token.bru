@@ -1,0 +1,25 @@
+meta {
+  name: Current user without token
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/auth/me
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns 401 UNAUTHENTICATED with a Bearer challenge", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getHeader("www-authenticate")).to.equal("Bearer");
+    expect(res.getBody()).to.eql({
+      error: {
+        code: "UNAUTHENTICATED",
+        message: "A valid access token is required",
+        requestId: res.getHeader("x-request-id"),
+      },
+    });
+  });
+}

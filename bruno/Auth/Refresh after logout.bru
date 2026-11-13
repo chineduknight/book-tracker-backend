@@ -1,0 +1,25 @@
+meta {
+  name: Refresh after logout
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+tests {
+  test("returns 401 INVALID_REFRESH_TOKEN", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().error.code).to.equal("INVALID_REFRESH_TOKEN");
+    expect(res.getBody().error.message).to.equal("Refresh token is invalid, expired or revoked");
+  });
+}

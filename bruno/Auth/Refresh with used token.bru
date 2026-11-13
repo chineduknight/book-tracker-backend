@@ -1,0 +1,29 @@
+meta {
+  name: Refresh with used token
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{consumedRefreshToken}}"
+  }
+}
+
+tests {
+  test("rejects a refresh token that was already exchanged", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().error.code).to.equal("INVALID_REFRESH_TOKEN");
+  });
+}
+
+docs {
+  Replays the token consumed by **Refresh**. The response is the same uniform 401; on an active
+  session this would also revoke the session (see the replay policy on **Refresh**).
+}
