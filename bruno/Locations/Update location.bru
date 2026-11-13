@@ -1,0 +1,38 @@
+meta {
+  name: Update location
+  type: http
+  seq: 6
+}
+
+patch {
+  url: {{baseUrl}}/locations/{{locationId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{locationsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "STUDY SHELF",
+    "description": null
+  }
+}
+
+tests {
+  test("allows a case-only rename and clears the description", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.name).to.equal("STUDY SHELF");
+    expect(res.getBody().data).to.not.have.property("description");
+  });
+}
+
+docs {
+  # PATCH /api/v1/locations/:locationId
+
+  Omitted fields stay unchanged; `"description": null` clears it; `name` cannot be null. Renaming
+  to another of the reader's names gives `409 CONFLICT`; changing only the case of the same
+  location is allowed. Empty bodies are rejected.
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Get location
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/locations/{{locationId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{locationsAccessToken}}
+}
+
+tests {
+  test("returns the location", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.id).to.equal(bru.getVar("locationId"));
+  });
+}

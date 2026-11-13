@@ -1,0 +1,15 @@
+meta {
+  name: Locations
+  seq: 5
+}
+
+docs {
+  # Storage locations
+
+  Named places where a reader keeps physical copies (`Home`, `Office`, `Study Shelf`). Each
+  reader has their own locations; names are unique per reader ignoring case and extra spaces.
+  There is deliberately **no delete endpoint** yet.
+
+  Run the folder in order. **Register locations reader** creates its own disposable account, so
+  the folder is independent of Auth and Books. Contract: `docs/api-contract.md` ("Locations").
+}

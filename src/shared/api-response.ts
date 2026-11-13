@@ -15,3 +15,7 @@ export interface PaginatedResponseBody<Item> {
   data: Item[];
   meta: { pagination: PaginationMeta };
 }
+
+export function toPaginationMeta(page: number, limit: number, total: number): PaginationMeta {
+  return { page, limit, total, totalPages: Math.ceil(total / limit) };
+}

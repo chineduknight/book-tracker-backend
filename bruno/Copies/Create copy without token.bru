@@ -1,0 +1,22 @@
+meta {
+  name: Create copy without token
+  type: http
+  seq: 17
+}
+
+post {
+  url: {{baseUrl}}/books/{{copiesBookId}}/copies
+  body: json
+  auth: none
+}
+
+body:json {
+  {}
+}
+
+tests {
+  test("returns 401 UNAUTHENTICATED", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().error.code).to.equal("UNAUTHENTICATED");
+  });
+}

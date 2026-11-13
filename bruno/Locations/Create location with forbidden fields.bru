@@ -1,0 +1,29 @@
+meta {
+  name: Create location with forbidden fields
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/locations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{locationsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "Office",
+    "ownerId": "64b7f0c2a1b2c3d4e5f60718"
+  }
+}
+
+tests {
+  test("rejects the owner field", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([{ field: "ownerId", message: "Unknown field" }]);
+  });
+}

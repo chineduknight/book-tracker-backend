@@ -1,0 +1,32 @@
+meta {
+  name: Create physical book
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "title": "The Hobbit",
+    "format": "physical"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("copiesBookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the parent book", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

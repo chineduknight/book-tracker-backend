@@ -1,0 +1,35 @@
+meta {
+  name: List locations
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/locations?page=1&limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+}
+
+auth:bearer {
+  token: {{locationsAccessToken}}
+}
+
+tests {
+  test("returns the reader's locations alphabetically with pagination", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.map((location) => location.id)).to.eql([bru.getVar("locationId")]);
+    expect(res.getBody().meta).to.eql({ pagination: { page: 1, limit: 20, total: 1, totalPages: 1 } });
+  });
+}
+
+docs {
+  # GET /api/v1/locations
+
+  Query: `page` (default 1), `limit` (1–100, default 20); nothing else. Alphabetical by name
+  ignoring case, `id` as tie-breaker.
+}

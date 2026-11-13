@@ -1,0 +1,21 @@
+meta {
+  name: Get deleted copy
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/copies/{{copyId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+tests {
+  test("returns 404 after deletion", function () {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

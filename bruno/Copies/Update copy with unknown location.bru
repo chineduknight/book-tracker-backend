@@ -1,0 +1,32 @@
+meta {
+  name: Update copy with unknown location
+  type: http
+  seq: 12
+}
+
+patch {
+  url: {{baseUrl}}/copies/{{copyId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "locationId": "64b7f0c2a1b2c3d4e5f60718"
+  }
+}
+
+tests {
+  test("returns 404 Location not found", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error.message).to.equal("Location not found");
+  });
+}
+
+docs {
+  A missing location and another reader's location give exactly this response.
+}

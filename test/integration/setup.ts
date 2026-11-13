@@ -3,6 +3,8 @@ import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { RefreshTokenModel } from '../../src/modules/auth/refresh-token.model.js';
 import { SessionModel } from '../../src/modules/auth/session.model.js';
 import { BookModel } from '../../src/modules/books/book.model.js';
+import { PhysicalCopyModel } from '../../src/modules/copies/copy.model.js';
+import { LocationModel } from '../../src/modules/locations/location.model.js';
 import { UserModel } from '../../src/modules/users/user.model.js';
 
 const TEST_DATABASE_NAME = 'book-tracker-test';
@@ -24,6 +26,8 @@ async function deleteAuthData(): Promise<void> {
     SessionModel.deleteMany({}),
     RefreshTokenModel.deleteMany({}),
     BookModel.deleteMany({}),
+    LocationModel.deleteMany({}),
+    PhysicalCopyModel.deleteMany({}),
   ]);
 }
 
@@ -37,6 +41,8 @@ beforeAll(async () => {
     SessionModel.syncIndexes(),
     RefreshTokenModel.syncIndexes(),
     BookModel.syncIndexes(),
+    LocationModel.syncIndexes(),
+    PhysicalCopyModel.syncIndexes(),
   ]);
 });
 

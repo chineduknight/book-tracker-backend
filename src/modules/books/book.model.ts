@@ -17,6 +17,7 @@ const bookSchema = new Schema(
     normalizedTitle: { type: String, required: true },
     normalizedIsbn: { type: String },
     deletedAt: { type: Date, default: null },
+    hasPhysicalCopyHistory: { type: Boolean, default: false },
   },
   { timestamps: true, strict: 'throw' },
 );

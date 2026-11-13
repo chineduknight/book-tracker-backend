@@ -1,0 +1,69 @@
+meta {
+  name: Create copy
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/books/{{copiesBookId}}/copies
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "label": "Signed copy",
+    "condition": "like_new",
+    "storageNote": "Top shelf, left",
+    "locationId": "{{copiesLocationId}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("copyId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public PhysicalCopyDto", function () {
+    expect(res.getStatus()).to.equal(201);
+    const copy = res.getBody().data;
+    expect(Object.keys(copy)).to.have.members([
+      "id", "bookId", "locationId", "label", "condition", "storageNote", "createdAt", "updatedAt",
+    ]);
+    expect(copy.bookId).to.equal(bru.getVar("copiesBookId"));
+    expect(copy.locationId).to.equal(bru.getVar("copiesLocationId"));
+    expect(res.getHeader("location")).to.equal(`/api/v1/copies/${copy.id}`);
+  });
+}
+
+docs {
+  # POST /api/v1/books/:bookId/copies
+
+  Adds one physical copy to one of the reader's **physical** books. Every body field is optional:
+  `label` (1–100), `condition` (`new` | `like_new` | `good` | `fair` | `poor`), `storageNote`
+  (1–500), `locationId` (one of the reader's locations, or `null`). The body may be empty.
+
+  **201 Created**, `Location: /api/v1/copies/{id}`
+
+  ```json
+  {
+    "data": {
+      "id": "6735a1f0c2a1b2c3d4e5f608",
+      "bookId": "6735a1f0c2a1b2c3d4e5f607",
+      "locationId": "6735a1f0c2a1b2c3d4e5f609",
+      "label": "Signed copy",
+      "condition": "like_new",
+      "storageNote": "Top shelf, left",
+      "createdAt": "2026-11-13T10:30:00.000Z",
+      "updatedAt": "2026-11-13T10:30:00.000Z"
+    }
+  }
+  ```
+
+  **Errors**: `400 VALIDATION_ERROR`; `401`; `404 NOT_FOUND` "Book not found" (missing, deleted
+  or another reader's book) or "Location not found"; `409 BOOK_NOT_PHYSICAL` (your ebook).
+}

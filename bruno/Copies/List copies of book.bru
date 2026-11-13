@@ -1,0 +1,34 @@
+meta {
+  name: List copies of book
+  type: http
+  seq: 9
+}
+
+get {
+  url: {{baseUrl}}/books/{{copiesBookId}}/copies?condition=like_new
+  body: none
+  auth: bearer
+}
+
+params:query {
+  condition: like_new
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+tests {
+  test("returns matching copies newest first with pagination", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.map((copy) => copy.id)).to.eql([bru.getVar("copyId")]);
+    expect(res.getBody().meta).to.eql({ pagination: { page: 1, limit: 20, total: 1, totalPages: 1 } });
+  });
+}
+
+docs {
+  # GET /api/v1/books/:bookId/copies
+
+  Query: `page`, `limit` (1–100), optional `locationId` (one of the reader's locations) and
+  `condition`. Newest first, `id` as tie-breaker. An ebook returns an empty page.
+}

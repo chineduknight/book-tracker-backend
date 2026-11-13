@@ -1,0 +1,31 @@
+meta {
+  name: Create shelf location
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/locations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "name": "Home"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("copiesLocationId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the location used by the copies", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

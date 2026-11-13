@@ -1,0 +1,41 @@
+meta {
+  name: Update copy
+  type: http
+  seq: 11
+}
+
+patch {
+  url: {{baseUrl}}/copies/{{copyId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "locationId": null,
+    "storageNote": null,
+    "condition": "good"
+  }
+}
+
+tests {
+  test("changes supplied fields and clears nulls", function () {
+    expect(res.getStatus()).to.equal(200);
+    const copy = res.getBody().data;
+    expect(copy.locationId).to.equal(null);
+    expect(copy).to.not.have.property("storageNote");
+    expect(copy.condition).to.equal("good");
+    expect(copy.label).to.equal("Signed copy");
+  });
+}
+
+docs {
+  # PATCH /api/v1/copies/:copyId
+
+  Changes `label`, `condition`, `storageNote` and `locationId` only; `null` clears each
+  (`locationId: null` unassigns the copy). `bookId` and `ownerId` are rejected as unknown fields.
+}

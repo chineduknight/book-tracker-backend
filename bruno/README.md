@@ -12,7 +12,9 @@ bruno/
 ├── Health/                 # liveness + readiness probes
 ├── Errors/                 # standard error envelope examples
 ├── Auth/                   # register, login, current user, refresh, logout (+ error cases)
-└── Books/                  # catalogue create, duplicate check, list/search, get, update, delete
+├── Books/                  # catalogue create, duplicate check, list/search, get, update, delete
+├── Locations/              # storage locations: create, duplicate, list, get, rename
+└── Copies/                 # physical copies: create, ebook/format conflicts, list, update, delete
 ```
 
 ## Use the desktop app
@@ -47,15 +49,16 @@ run **Register** first.
 
 ## Books requests
 
-The **Books** folder starts with **Register books reader**, which creates its own disposable
-account and access token (`booksAccessToken`). It does not reuse the Auth folder's tokens, which
-that folder deliberately logs out, so Books runs reliably on its own or after Auth.
+The **Books**, **Locations** and **Copies** folders each start by registering their own
+disposable reader (`booksAccessToken`, `locationsAccessToken`, `copiesAccessToken`) and create
+their own books and locations. None reuses the Auth folder's tokens, which that folder
+deliberately logs out, so each folder runs reliably on its own or as part of the whole collection.
 
 ## Rate limits during runs
 
-A full run creates two accounts and makes four registration attempts (three in Auth, one in
-Books), which count towards the per-address registration limit (20 per hour), so about five full
-runs fit in an hour. Restarting the API resets the in-memory limits.
+A full run creates four accounts and makes six registration attempts (three in Auth, one each in
+Books, Locations and Copies). They count towards the per-address registration limit (20 per
+hour), so about three full runs fit in an hour. Restarting the API resets the in-memory limits.
 
 ## Secrets
 
