@@ -1,24 +1,10 @@
 import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import { ReadingSessionModel } from '../../src/modules/reading/reading.model.js';
+import { indexNamesIn, indexesUsedBy } from './query-plans.js';
 
 const ownerId = new mongoose.Types.ObjectId();
 const bookId = new mongoose.Types.ObjectId();
-
-function indexNamesIn(plan: unknown, names = new Set<string>()): Set<string> {
-  if (Array.isArray(plan)) plan.forEach((stage) => indexNamesIn(stage, names));
-  else if (typeof plan === 'object' && plan !== null) {
-    for (const [key, value] of Object.entries(plan)) {
-      if (key === 'indexName' && typeof value === 'string') names.add(value);
-      else indexNamesIn(value, names);
-    }
-  }
-  return names;
-}
-
-async function indexesUsedBy(query: { explain(verbosity: string): Promise<unknown> }) {
-  return [...indexNamesIn(await query.explain('queryPlanner'))];
-}
 
 describe('reading session indexes', () => {
   it('declares the history indexes and a partial unique in-progress index', async () => {
@@ -68,6 +54,6 @@ describe('reading session indexes', () => {
       { $sort: { createdAt: -1, _id: -1 } },
     ]).explain('queryPlanner');
 
-    expect([...indexNamesIn(explanation)]).toContain('owner_status_recent');
+    expect(indexNamesIn(explanation)).toContain('owner_status_recent');
   });
 });
