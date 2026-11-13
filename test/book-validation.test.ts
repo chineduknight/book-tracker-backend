@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeIsbnForMatching,
   normalizeTitleForMatching,
-  toTextSearchWords,
 } from '../src/modules/books/book.normalization.js';
+import { toTextSearchWords } from '../src/shared/text.js';
 import {
   bookIdParamsSchema,
   createBookRequestSchema,

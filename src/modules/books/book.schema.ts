@@ -6,6 +6,7 @@ import {
   singleQueryChoice,
   singleQueryValue,
   requiringAtLeastOneChange,
+  textSearchQueryParameter,
 } from '../../shared/request-schemas.js';
 import { collapseWhitespace, containsLetterOrDigit } from '../../shared/text.js';
 
@@ -63,11 +64,7 @@ export const updateBookRequestSchema = requiringAtLeastOneChange(
 export const listBooksQuerySchema = z.strictObject({
   page: pageQueryParameter,
   limit: limitQueryParameter,
-  q: singleQueryValue
-    .trim()
-    .max(120)
-    .refine(containsLetterOrDigit, 'must contain at least one letter or digit')
-    .optional(),
+  q: textSearchQueryParameter.optional(),
   format: singleQueryChoice(BOOK_FORMATS).optional(),
   sort: singleQueryChoice(BOOK_SORT_ORDERS).default('recent'),
 });
