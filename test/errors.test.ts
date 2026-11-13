@@ -52,6 +52,15 @@ describe('unknown routes', () => {
   );
 });
 
+describe('unsupported methods on known paths', () => {
+  it('returns 404 NOT_FOUND rather than 405', async () => {
+    const res = await request(createTestApp()).post('/api/v1/health').send({});
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatchObject({ code: 'NOT_FOUND', message: 'Route not found' });
+  });
+});
+
 describe('error serialization', () => {
   it('serializes AppError with its status, code and details', async () => {
     const res = await request(createThrowingApp()).get('/conflict');
@@ -125,5 +134,18 @@ describe('error serialization', () => {
 
     expect(res.status).toBe(413);
     expect(res.body.error).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
+  });
+
+  it('rejects unsupported body charsets with 415 UNSUPPORTED_MEDIA_TYPE', async () => {
+    const res = await request(createTestApp())
+      .post('/api/v1/health')
+      .set('Content-Type', 'application/json; charset=latin9')
+      .send('{}');
+
+    expect(res.status).toBe(415);
+    expect(res.body.error).toMatchObject({
+      code: 'UNSUPPORTED_MEDIA_TYPE',
+      message: 'Request body encoding is not supported',
+    });
   });
 });

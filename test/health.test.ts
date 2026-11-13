@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
+import type {
+  LivenessResponseBody,
+  ReadinessResponseBody,
+} from '../src/modules/health/health.dto.js';
+import type { ErrorResponseBody } from '../src/shared/api-response.js';
 import { createTestApp, mockDatabaseState } from './helpers.js';
 
 const { ConnectionStates } = mongoose;
@@ -14,7 +19,24 @@ describe('GET /api/v1/health (liveness)', () => {
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/application\/json/);
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(res.body).toEqual({ data: { status: 'ok', timestamp: expect.any(String) } });
+    const expectedBody: LivenessResponseBody = {
+      data: { status: 'ok', timestamp: expect.any(String) },
+    };
+    expect(res.body).toEqual(expectedBody);
+  });
+
+  it('reports the timestamp as an ISO 8601 UTC string', async () => {
+    const res = await request(createTestApp()).get('/api/v1/health');
+
+    const { timestamp } = (res.body as LivenessResponseBody).data;
+    expect(new Date(timestamp).toISOString()).toBe(timestamp);
+  });
+
+  it('answers HEAD with the same status and no body', async () => {
+    const res = await request(createTestApp()).head('/api/v1/health');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toBeUndefined();
   });
 });
 
@@ -25,7 +47,10 @@ describe('GET /api/v1/ready (readiness)', () => {
     const res = await request(createTestApp()).get('/api/v1/ready');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ data: { status: 'ready', checks: { database: 'connected' } } });
+    const expectedBody: ReadinessResponseBody = {
+      data: { status: 'ready', checks: { database: 'connected' } },
+    };
+    expect(res.body).toEqual(expectedBody);
   });
 
   it.each([
@@ -39,12 +64,22 @@ describe('GET /api/v1/ready (readiness)', () => {
 
     expect(res.status).toBe(503);
     expect(res.headers['cache-control']).toBe('no-store');
-    expect(res.body).toEqual({
+    const expectedBody: ErrorResponseBody = {
       error: {
         code: 'SERVICE_UNAVAILABLE',
         message: 'Service is not ready: database is not connected',
         requestId: expect.any(String),
       },
-    });
+    };
+    expect(res.body).toEqual(expectedBody);
+  });
+
+  it('answers HEAD with 503 and no body when MongoDB is disconnected', async () => {
+    mockDatabaseState(ConnectionStates.disconnected);
+
+    const res = await request(createTestApp()).head('/api/v1/ready');
+
+    expect(res.status).toBe(503);
+    expect(res.text).toBeUndefined();
   });
 });
