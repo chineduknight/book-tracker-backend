@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { createTestApp } from './helpers.js';
+import { ALLOWED_ORIGIN, createTestApp } from './helpers.js';
 
 const SUPPLIED_PASSWORD = 'tiny-secret';
 
@@ -91,5 +91,63 @@ describe('GET /api/v1/auth/me without valid credentials', () => {
         requestId: res.headers['x-request-id'],
       },
     });
+  });
+});
+
+describe('Cache-Control on auth responses produced before routing', () => {
+  const OVERSIZED_BODY = JSON.stringify({
+    email: 'jane@example.com',
+    password: 'x'.repeat(200 * 1024),
+  });
+
+  it.each([
+    ['malformed JSON', 'application/json', '{"email": ', 400, 'INVALID_JSON'],
+    ['an oversized body', 'application/json', OVERSIZED_BODY, 413, 'PAYLOAD_TOO_LARGE'],
+    [
+      'an unsupported charset',
+      'application/json; charset=latin9',
+      '{}',
+      415,
+      'UNSUPPORTED_MEDIA_TYPE',
+    ],
+  ])(
+    'sends no-store when the body parser rejects %s',
+    async (_label, contentType, body, status, code) => {
+      const res = await request(createTestApp())
+        .post('/api/v1/auth/login')
+        .set('Content-Type', contentType)
+        .send(body);
+
+      expect(res.status).toBe(status);
+      expect(res.body.error.code).toBe(code);
+      expect(res.headers['cache-control']).toBe('no-store');
+    },
+  );
+
+  it('sends no-store on unknown auth routes', async () => {
+    const res = await request(createTestApp()).get('/api/v1/auth/unknown');
+
+    expect(res.status).toBe(404);
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  it('sends no-store on auth CORS preflight responses', async () => {
+    const res = await request(createTestApp())
+      .options('/api/v1/auth/login')
+      .set('Origin', ALLOWED_ORIGIN)
+      .set('Access-Control-Request-Method', 'POST');
+
+    expect(res.status).toBe(204);
+    expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  it('leaves body-parser errors outside /auth unchanged', async () => {
+    const res = await request(createTestApp())
+      .post('/api/v1/health')
+      .set('Content-Type', 'application/json')
+      .send('{"email": ');
+
+    expect(res.status).toBe(400);
+    expect(res.headers['cache-control']).toBeUndefined();
   });
 });

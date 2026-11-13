@@ -3,6 +3,7 @@ import express, { Router, type Express } from 'express';
 import helmet from 'helmet';
 import type { Logger } from './config/logger.js';
 import { errorHandler, notFoundHandler } from './middleware/error-handler.js';
+import { preventResponseCaching } from './middleware/prevent-response-caching.js';
 import { REQUEST_ID_HEADER, requestLogger } from './middleware/request-logger.js';
 import { createAccessTokenService } from './modules/auth/access-token.js';
 import { createAuthenticationMiddleware } from './modules/auth/auth.middleware.js';
@@ -11,6 +12,7 @@ import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
 export const API_PREFIX = '/api/v1';
+const AUTH_PATH = '/auth';
 export const JSON_BODY_LIMIT = '100kb';
 
 export interface AppOptions {
@@ -32,6 +34,8 @@ export function createApp({
   app.disable('x-powered-by');
 
   app.use(requestLogger(logger));
+  // Before CORS and the body parser, so preflight and body-parsing errors are covered too.
+  app.use(`${API_PREFIX}${AUTH_PATH}`, preventResponseCaching);
   app.use(helmet());
   app.use(
     cors({
@@ -51,7 +55,7 @@ export function createApp({
   const api = Router();
   api.use(healthRouter);
   api.use(
-    '/auth',
+    AUTH_PATH,
     createAuthRouter({ accessTokens, requireAuthenticatedUser, rateLimits: authRateLimits }),
   );
   app.use(API_PREFIX, api);

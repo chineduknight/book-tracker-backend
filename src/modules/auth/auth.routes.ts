@@ -23,11 +23,6 @@ export interface AuthRouterDependencies {
   rateLimits: AuthRateLimits;
 }
 
-const preventResponseCaching: RequestHandler = (_req, res, next) => {
-  res.set('Cache-Control', 'no-store');
-  next();
-};
-
 export function createAuthRouter({
   accessTokens,
   requireAuthenticatedUser,
@@ -36,8 +31,6 @@ export function createAuthRouter({
   const authService = createAuthService(accessTokens);
   const limiters = createAuthRateLimiters(rateLimits);
   const authRouter = Router();
-
-  authRouter.use(preventResponseCaching);
 
   authRouter.post(
     '/register',
