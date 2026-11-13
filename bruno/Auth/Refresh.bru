@@ -52,6 +52,7 @@ docs {
   already-used tokens; `429 RATE_LIMITED`.
 
   **Replay policy**: presenting an already-used refresh token revokes the whole session (both
-  the attacker's and the legitimate client's tokens stop working). Clients must therefore never
-  send two refreshes with the same token concurrently.
+  the attacker's and the legitimate client's tokens stop working), however many rotations ago it
+  was used, for the session's whole lifetime. Clients must therefore never send two refreshes
+  with the same token concurrently.
 }

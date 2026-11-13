@@ -72,14 +72,18 @@ Details and exact responses are in the [API contract](api-contract.md#authentica
   (19 MiB memory, 2 iterations, parallelism 1); about 12 ms per hash on a developer laptop.
   The parameters are stored in each hash, so they can be raised later without breaking logins.
   Passwords are never trimmed or altered.
-- **Server-side sessions:** each login creates a session record (user, current refresh-token
-  SHA-256 digest, absolute 30-day expiry, revocation fields). Rotation is one atomic
-  `findOneAndUpdate` conditioned on the current digest, so concurrent refreshes cannot both
-  succeed. Protected routes also check that the session is active, so logout is immediate.
+- **Server-side sessions:** each login creates a fixed-size session record (user, absolute
+  30-day expiry, revocation fields). Every refresh token the session issues gets its own record
+  (SHA-256 digest, `active` or `consumed`, expiry equal to the session's). Rotation consumes the
+  presented token with one atomic `findOneAndUpdate` (`active` → `consumed`), so concurrent
+  refreshes cannot both succeed; a partial unique index allows only one `active` token per
+  session. Protected routes also check that the session is active, so logout is immediate.
 - **Refresh-token reuse revokes the session.** A reused token proves a copy exists somewhere, so
   the whole session is revoked. The cost: a client that sends two refreshes concurrently loses
-  its session. Only digests of tokens this session actually issued can trigger revocation, so a
-  guessed token cannot revoke anyone else's session.
+  its session. Only digests of tokens a session actually issued can trigger revocation, so a
+  guessed token cannot revoke anyone else's session. Consumed-token records are kept until the
+  session expires, so detection covers the whole session lifetime; a TTL index then deletes them
+  with the session, so storage is bounded by the session lifetime and the refresh rate limits.
 - **Registration reveals existing emails** through `409 CONFLICT`. Accepted for the MVP;
   revisit when email verification is added. Registration is throttled per address.
 - **No email verification yet.** Accounts are active immediately; email ownership is unproven.

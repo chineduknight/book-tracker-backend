@@ -14,5 +14,6 @@ docs {
   pre-request script and stores them, and every token, only in Bruno runtime variables. Nothing
   secret is committed and runtime variables are not written to disk.
 
-  Every auth response sends `Cache-Control: no-store`. Contract: `docs/api-contract.md`.
+  Every auth response sends `Cache-Control: no-store`, including body-parser errors and CORS
+  preflight. Contract: `docs/api-contract.md`.
 }

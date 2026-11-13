@@ -39,7 +39,8 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 - `modules/users` owns the `users` collection (unique index on the normalized email) and exposes
   `createUser`, `findUserCredentialsByNormalizedEmail` and `findUserById`. Only `UserDto` leaves
   the module, apart from the password hash that login needs.
-- `modules/auth` owns registration, login, sessions (`sessions` collection), token issuance and
+- `modules/auth` owns registration, login, sessions (`sessions` collection), refresh-token
+  history (`refreshtokens` collection), token issuance and
   the `requireAuthenticatedUser` middleware. `app.ts` creates the middleware once and passes it
   to every router that needs it.
 - **Guarantee of `requireAuthenticatedUser`:** after it runs, `authenticatedUserOf(req)` returns
@@ -64,7 +65,7 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 
 ## Future data model (design notes, not implemented)
 
-`User` and `Session` exist (see above); the remaining models are design notes.
+`User`, `Session` and `RefreshToken` exist (see above); the remaining models are design notes.
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)
