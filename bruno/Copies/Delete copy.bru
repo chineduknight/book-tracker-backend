@@ -1,0 +1,29 @@
+meta {
+  name: Delete copy
+  type: http
+  seq: 15
+}
+
+delete {
+  url: {{baseUrl}}/copies/{{copyId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+tests {
+  test("returns 204 with an empty body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # DELETE /api/v1/copies/:copyId
+
+  Soft delete: the copy disappears from every endpoint but its record is kept for future lending
+  history. Deleting the parent book also hides its copies without deleting them.
+}

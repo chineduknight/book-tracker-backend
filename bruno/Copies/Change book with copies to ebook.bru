@@ -1,0 +1,38 @@
+meta {
+  name: Change book with copies to ebook
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/books/{{copiesBookId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "format": "ebook"
+  }
+}
+
+tests {
+  test("returns 409 BOOK_HAS_PHYSICAL_COPIES", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error).to.eql({
+      code: "BOOK_HAS_PHYSICAL_COPIES",
+      message: "A book with physical copies cannot become an ebook",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}
+
+docs {
+  `PATCH /api/v1/books/:bookId` refuses `"format": "ebook"` for a book that has, or ever had, a
+  physical copy (deleted copies count: they may be referenced by future loan history). Books
+  without copy history can still change format.
+}

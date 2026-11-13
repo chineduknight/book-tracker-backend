@@ -1,0 +1,22 @@
+meta {
+  name: Get copy
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/copies/{{copyId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+tests {
+  test("returns the copy", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.label).to.equal("Signed copy");
+  });
+}

@@ -1,0 +1,37 @@
+meta {
+  name: Register copies reader
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno Copies Reader",
+    "email": "{{copiesEmail}}",
+    "password": "{{copiesPassword}}"
+  }
+}
+
+script:pre-request {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  bru.setVar("copiesEmail", `bruno-copies-${runId}@example.test`);
+  bru.setVar("copiesPassword", `disposable-${runId}`);
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("copiesAccessToken", res.getBody().data.tokens.accessToken);
+  }
+}
+
+tests {
+  test("creates the disposable reader used by this folder", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

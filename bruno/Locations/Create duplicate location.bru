@@ -1,0 +1,34 @@
+meta {
+  name: Create duplicate location
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/locations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{locationsAccessToken}}
+}
+
+body:json {
+  {
+    "name": " study shelf "
+  }
+}
+
+tests {
+  test("returns 409 CONFLICT for a name that differs only in case and spacing", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody()).to.eql({
+      error: {
+        code: "CONFLICT",
+        message: "A location with this name already exists",
+        requestId: res.getHeader("x-request-id"),
+      },
+    });
+  });
+}

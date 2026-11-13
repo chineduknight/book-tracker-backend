@@ -1,0 +1,32 @@
+meta {
+  name: Create ebook
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "title": "The Hobbit",
+    "format": "ebook"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("copiesEbookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates an ebook catalogue entry", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

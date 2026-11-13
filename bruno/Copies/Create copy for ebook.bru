@@ -1,0 +1,32 @@
+meta {
+  name: Create copy for ebook
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/books/{{copiesEbookId}}/copies
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "label": "Copy 1"
+  }
+}
+
+tests {
+  test("returns 409 BOOK_NOT_PHYSICAL", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error).to.eql({
+      code: "BOOK_NOT_PHYSICAL",
+      message: "Physical copies can only be added to physical books",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}

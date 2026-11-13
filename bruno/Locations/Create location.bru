@@ -1,0 +1,61 @@
+meta {
+  name: Create location
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/locations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{locationsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "  Study   Shelf ",
+    "description": "Left of the window"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("locationId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public StorageLocationDto", function () {
+    expect(res.getStatus()).to.equal(201);
+    const location = res.getBody().data;
+    expect(Object.keys(location)).to.have.members(["id", "name", "description", "createdAt", "updatedAt"]);
+    expect(location.name).to.equal("Study Shelf");
+    expect(res.getHeader("location")).to.equal(`/api/v1/locations/${location.id}`);
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/locations
+
+  `name` (required, whitespace collapsed, 1–100 characters) and optional `description`
+  (trimmed, 1–500). Unknown fields such as `ownerId` are rejected.
+
+  **201 Created**, `Location: /api/v1/locations/{id}`
+
+  ```json
+  {
+    "data": {
+      "id": "6735a1f0c2a1b2c3d4e5f607",
+      "name": "Study Shelf",
+      "description": "Left of the window",
+      "createdAt": "2026-11-13T10:30:00.000Z",
+      "updatedAt": "2026-11-13T10:30:00.000Z"
+    }
+  }
+  ```
+
+  **Errors**: `400 VALIDATION_ERROR`, `401 UNAUTHENTICATED`, `409 CONFLICT` (name already used
+  by this reader, ignoring case and spacing).
+}

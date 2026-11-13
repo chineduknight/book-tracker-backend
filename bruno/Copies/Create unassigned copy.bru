@@ -1,0 +1,29 @@
+meta {
+  name: Create unassigned copy
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/books/{{copiesBookId}}/copies
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{copiesAccessToken}}
+}
+
+body:json {
+  {
+    "label": "Reading copy"
+  }
+}
+
+tests {
+  test("returns locationId null when no location is assigned", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.locationId).to.equal(null);
+    expect(res.getBody().data).to.not.have.property("condition");
+  });
+}
