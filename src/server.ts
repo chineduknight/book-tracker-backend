@@ -77,8 +77,8 @@ async function main(): Promise<void> {
     }
   };
 
-  process.once('SIGTERM', (signal) => void shutdown(signal));
-  process.once('SIGINT', (signal) => void shutdown(signal));
+  process.once('SIGTERM', () => void shutdown('SIGTERM'));
+  process.once('SIGINT', () => void shutdown('SIGINT'));
 }
 
 main().catch((error: unknown) => {
