@@ -81,17 +81,18 @@ names; values are never printed.
 
 ## Scripts
 
-| Command                    | What it does                                                           |
-| -------------------------- | ---------------------------------------------------------------------- |
-| `npm run dev`              | Watch mode via `tsx`, loads `.env`, pretty logs                        |
-| `npm run build`            | Compile `src/` → `dist/` with `tsc`                                    |
-| `npm start`                | Run the compiled server (`dist/server.js`), loads `.env` if present    |
-| `npm run typecheck`        | Type-check sources, tests and configs                                  |
-| `npm run lint`             | ESLint                                                                 |
-| `npm run format`           | Prettier write (`format:check` to verify)                              |
-| `npm test`                 | Unit and HTTP tests without a database (`test:watch` for watch mode)   |
-| `npm run test:integration` | MongoDB-backed tests; requires `MONGODB_TEST_URI` and fails without it |
-| `npm run api:test`         | Run the Bruno collection against the local API                         |
+| Command                    | What it does                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `npm run dev`              | Watch mode via `tsx`, loads `.env`, pretty logs                                                          |
+| `npm run build`            | Compile `src/` → `dist/` with `tsc`                                                                      |
+| `npm start`                | Run the compiled server (`dist/server.js`), loads `.env` if present                                      |
+| `npm run typecheck`        | Type-check sources, tests and configs                                                                    |
+| `npm run lint`             | ESLint                                                                                                   |
+| `npm run format`           | Prettier write (`format:check` to verify)                                                                |
+| `npm test`                 | Unit and HTTP tests without a database (`test:watch` for watch mode)                                     |
+| `npm run test:integration` | MongoDB-backed tests; requires `MONGODB_TEST_URI` and fails without it                                   |
+| `npm run api:test`         | Run the Bruno collection against the local API                                                           |
+| `npm run api:smoke`        | Build, start a fresh API on port 3100 against `book-tracker-smoke`, run the whole Bruno collection, stop |
 
 ## API
 
@@ -101,30 +102,36 @@ All routes are under `/api/v1`. Success bodies are `{ "data": ... }`; errors are
 The [API contract](docs/api-contract.md) lists every status and body, including `HEAD`, CORS
 preflight and request-body errors.
 
-| Method | Path                            | Purpose                                                      |
-| ------ | ------------------------------- | ------------------------------------------------------------ |
-| GET    | `/api/v1/health`                | Liveness. Always 200 while the process serves HTTP           |
-| GET    | `/api/v1/ready`                 | Readiness. 200 when MongoDB is connected, otherwise 503      |
-| POST   | `/api/v1/auth/register`         | Create an account and start a session (201)                  |
-| POST   | `/api/v1/auth/login`            | Start a session with email and password                      |
-| POST   | `/api/v1/auth/refresh`          | Exchange a refresh token for a new token pair                |
-| POST   | `/api/v1/auth/logout`           | Revoke the session that owns a refresh token (204)           |
-| GET    | `/api/v1/auth/me`               | The authenticated user (bearer access token)                 |
-| POST   | `/api/v1/books`                 | Add a book to the reader's catalogue (201 + `Location`)      |
-| GET    | `/api/v1/books`                 | List, search, filter and sort the reader's books (paginated) |
-| GET    | `/api/v1/books/duplicate-check` | Suggest existing books with the same title or ISBN           |
-| GET    | `/api/v1/books/:bookId`         | One of the reader's books                                    |
-| PATCH  | `/api/v1/books/:bookId`         | Change fields; `null` clears an optional field               |
-| DELETE | `/api/v1/books/:bookId`         | Soft-delete a book (204)                                     |
-| POST   | `/api/v1/locations`             | Create a named storage location (201 + `Location`)           |
-| GET    | `/api/v1/locations`             | List the reader's locations alphabetically (paginated)       |
-| GET    | `/api/v1/locations/:locationId` | One of the reader's locations                                |
-| PATCH  | `/api/v1/locations/:locationId` | Rename a location or change/clear its description            |
-| POST   | `/api/v1/books/:bookId/copies`  | Add a physical copy to a physical book (201 + `Location`)    |
-| GET    | `/api/v1/books/:bookId/copies`  | List a book's copies, filter by location or condition        |
-| GET    | `/api/v1/copies/:copyId`        | One physical copy                                            |
-| PATCH  | `/api/v1/copies/:copyId`        | Change label, condition, note or location; `null` clears     |
-| DELETE | `/api/v1/copies/:copyId`        | Soft-delete a copy (204)                                     |
+| Method | Path                                     | Purpose                                                                |
+| ------ | ---------------------------------------- | ---------------------------------------------------------------------- |
+| GET    | `/api/v1/health`                         | Liveness. Always 200 while the process serves HTTP                     |
+| GET    | `/api/v1/ready`                          | Readiness. 200 when MongoDB is connected, otherwise 503                |
+| POST   | `/api/v1/auth/register`                  | Create an account and start a session (201)                            |
+| POST   | `/api/v1/auth/login`                     | Start a session with email and password                                |
+| POST   | `/api/v1/auth/refresh`                   | Exchange a refresh token for a new token pair                          |
+| POST   | `/api/v1/auth/logout`                    | Revoke the session that owns a refresh token (204)                     |
+| GET    | `/api/v1/auth/me`                        | The authenticated user (bearer access token)                           |
+| POST   | `/api/v1/books`                          | Add a book to the reader's catalogue (201 + `Location`)                |
+| GET    | `/api/v1/books`                          | List, search, filter and sort the reader's books (paginated)           |
+| GET    | `/api/v1/books/duplicate-check`          | Suggest existing books with the same title or ISBN                     |
+| GET    | `/api/v1/books/:bookId`                  | One of the reader's books                                              |
+| PATCH  | `/api/v1/books/:bookId`                  | Change fields; `null` clears an optional field                         |
+| DELETE | `/api/v1/books/:bookId`                  | Soft-delete a book (204)                                               |
+| POST   | `/api/v1/locations`                      | Create a named storage location (201 + `Location`)                     |
+| GET    | `/api/v1/locations`                      | List the reader's locations alphabetically (paginated)                 |
+| GET    | `/api/v1/locations/:locationId`          | One of the reader's locations                                          |
+| PATCH  | `/api/v1/locations/:locationId`          | Rename a location or change/clear its description                      |
+| POST   | `/api/v1/books/:bookId/copies`           | Add a physical copy to a physical book (201 + `Location`)              |
+| GET    | `/api/v1/books/:bookId/copies`           | List a book's copies, filter by location or condition                  |
+| GET    | `/api/v1/copies/:copyId`                 | One physical copy                                                      |
+| PATCH  | `/api/v1/copies/:copyId`                 | Change label, condition, note or location; `null` clears               |
+| DELETE | `/api/v1/copies/:copyId`                 | Soft-delete a copy (204)                                               |
+| POST   | `/api/v1/books/:bookId/reading-sessions` | Start a reading, or record an earlier completed one (201 + `Location`) |
+| GET    | `/api/v1/books/:bookId/reading-sessions` | One book's reading history (paginated)                                 |
+| GET    | `/api/v1/books/:bookId/reading-overview` | Derived reading status (`unread`, `reading`, `completed`) and sessions |
+| GET    | `/api/v1/reading-sessions`               | All of the reader's reading history (paginated)                        |
+| GET    | `/api/v1/reading-sessions/:sessionId`    | One reading session                                                    |
+| PATCH  | `/api/v1/reading-sessions/:sessionId`    | Record progress, finish, or correct a session                          |
 
 Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
 token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
@@ -148,17 +155,20 @@ src/
 ├── modules/books/         # book catalogue: model, schemas, DTOs, service, routes
 ├── modules/copies/        # physical copies of physical books
 ├── modules/locations/     # reader-owned storage locations
+├── modules/reading/       # reading sessions, rereads and the derived reading overview
 ├── modules/health/        # liveness and readiness routes + response DTOs
 ├── modules/users/         # user model, public UserDto, user service
 └── shared/                # AppError, response envelopes, request validation, safe errors
 test/                      # Vitest + Supertest without a database
 test/integration/          # Vitest + Supertest against a real MongoDB (book-tracker-test)
 bruno/                     # Bruno collection (API docs + executable examples)
-docs/                      # architecture, product invariants, API contract
+scripts/                   # api-smoke.ts: fresh API instance + whole Bruno collection
+docs/                      # architecture, decisions, API contract, operations runbook
 AGENTS.md                  # engineering standards (CLAUDE.md imports it)
 ```
 
-See [docs/architecture.md](docs/architecture.md) and [docs/decisions.md](docs/decisions.md).
+See [docs/architecture.md](docs/architecture.md), [docs/decisions.md](docs/decisions.md) and the
+[operations runbook](docs/operations.md).
 
 ## Running the integration tests
 
@@ -181,14 +191,14 @@ Included: scaffold, config validation, MongoDB lifecycle, health/readiness, secu
 (helmet, CORS allowlist, 100 kB JSON limit), structured logging with redaction, error handling,
 authentication and user accounts (register, login, refresh, logout, current user), the private
 book catalogue (create, list, search, filter, sort, update, soft delete, duplicate suggestions),
-storage locations and physical copies, tests, CI, Bruno.
+storage locations and physical copies, reading sessions with rereads and a derived reading
+overview, tests, CI, Bruno.
 
-Not included yet: email verification, password reset, OAuth, reading/note/loan endpoints, book
-restore, location deletion, UI, deployment.
+Not included yet: email verification, password reset, OAuth, notes, loans, book restore, location
+deletion, reading-session deletion, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Reading sessions**: reads and rereads with optional completion date, rating and summary.
-2. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
-3. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
-4. **Export**: full per-user data export.
+1. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
+2. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
+3. **Export**: full per-user data export.

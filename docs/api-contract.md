@@ -7,7 +7,7 @@ This document defines shared HTTP behavior. Every implemented endpoint must addi
 - Base path: `/api/v1`.
 - JSON responses use `Content-Type: application/json`; `204 No Content` has no body.
 - All responses include an `X-Request-Id` header. Error responses also include `requestId` in the body if one was assigned.
-- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies` and `/api/v1/locations` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
+- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations` and `/api/v1/reading-sessions` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
 - CORS exposes `X-Request-Id` and `Location` to allowed browser origins.
 - **Logging:** request logs contain the method, the URL path (which includes resource ids such as `/api/v1/books/{id}`), the status and the request id. Query strings, headers and bodies are never logged, so titles, search terms, location names, notes, emails, passwords and tokens never reach the logs.
 - Public IDs are strings named `id`, not MongoDB `_id`; never return `__v` or internal model fields.
@@ -79,18 +79,18 @@ Every error uses the established envelope:
 
 `details` is optional, contains only safe field-level feedback, and must not expose credentials, database messages, or input secrets. Known error bodies use a safe, stable `code` and human-readable `message`.
 
-| Status                       | Intended use                                                                    | Example code                                                      |
-| ---------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                |
-| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN` |
-| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                       |
-| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                       |
-| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`       |
-| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                               |
-| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                          |
-| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                    |
-| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                  |
-| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                             |
+| Status                       | Intended use                                                                    | Example code                                                                                                                                                |
+| ---------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                                                                                                          |
+| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN`                                                                                           |
+| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                                                                                                                 |
+| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                                                                                                                 |
+| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`, `READING_SESSION_IN_PROGRESS`, `INVALID_READING_TRANSITION`, `READING_SESSION_UPDATE_CONFLICT` |
+| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                                                                                                                         |
+| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                                                                                                                    |
+| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                                                                                                              |
+| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                                                                                                            |
+| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                                                                                                                       |
 
 Do not change existing implemented error codes merely to match these suggested names; preserve current behavior or propose an explicit breaking-change decision. Avoid `200` responses that represent errors inside `data`.
 
@@ -338,6 +338,81 @@ interface PhysicalCopyDto {
 - **Visibility:** a copy is visible only while it and its parent book are both active. Copies of a deleted book return `404 "Copy not found"` from get, update and delete, and listing a deleted book's copies returns `404 "Book not found"`.
 - **Deletion is soft:** `DELETE` marks the copy deleted and returns `204`; it then behaves as missing everywhere, and a repeated delete returns `404`. The record is kept for future lending history.
 - **No lending status:** there is no `isAvailable` or `isOnLoan`; availability will be derived from active loans.
+
+### Reading sessions
+
+A reading session is **one distinct reading of a book** (physical or ebook). Starting, progressing and finishing happen on a session; rereading starts a new one, and earlier sessions are never overwritten. Books do not store a reading status; it is derived from sessions by the reading overview. Sessions attach to the book, not to a physical copy. Every endpoint requires a bearer access token. DTOs: `src/modules/reading/reading.dto.ts`. Bruno: `bruno/Reading/`.
+
+```ts
+type ReadingProgress =
+  | { unit: 'pages'; value: number }
+  | { unit: 'chapters'; value: number }
+  | { unit: 'percent'; value: number };
+
+interface ReadingSessionDto {
+  id: string; // 24-character lowercase hex
+  bookId: string;
+  status: 'in_progress' | 'completed';
+  progress: ReadingProgress | null; // always present; null when not recorded
+  startedOn?: string; // YYYY-MM-DD, omitted when unset
+  completedOn?: string; // YYYY-MM-DD, omitted when unset
+  rating?: number; // 1–5, omitted when unset
+  summary?: string; // omitted when unset
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC
+}
+
+type BookReadingStatus = 'unread' | 'reading' | 'completed';
+
+interface BookReadingOverviewDto {
+  bookId: string;
+  status: BookReadingStatus;
+  totalSessions: number;
+  completedSessions: number;
+  activeSession: ReadingSessionDto | null;
+  lastCompletedSession: ReadingSessionDto | null;
+}
+```
+
+| Method  | Path                                     | Request                        | Success                                                                          | Errors                                                                                                                  |
+| ------- | ---------------------------------------- | ------------------------------ | -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `POST`  | `/api/v1/books/:bookId/reading-sessions` | Session fields (body optional) | `201` `{ "data": ReadingSessionDto }`, `Location: /api/v1/reading-sessions/{id}` | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found", `409 READING_SESSION_IN_PROGRESS`                      |
+| `GET`   | `/api/v1/books/:bookId/reading-sessions` | History query                  | `200` `{ "data": ReadingSessionDto[], "meta": { "pagination" } }`                | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found"                                                         |
+| `GET`   | `/api/v1/books/:bookId/reading-overview` | —                              | `200` `{ "data": BookReadingOverviewDto }`                                       | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found"                                                         |
+| `GET`   | `/api/v1/reading-sessions`               | History query                  | `200` `{ "data": ReadingSessionDto[], "meta": { "pagination" } }`                | `400 VALIDATION_ERROR`, `401`                                                                                           |
+| `GET`   | `/api/v1/reading-sessions/:sessionId`    | —                              | `200` `{ "data": ReadingSessionDto }`                                            | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Reading session not found"                                              |
+| `PATCH` | `/api/v1/reading-sessions/:sessionId`    | Fields to change, at least one | `200` `{ "data": ReadingSessionDto }`                                            | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`, `409 INVALID_READING_TRANSITION`, `409 READING_SESSION_UPDATE_CONFLICT` |
+
+There is no endpoint to delete a reading session.
+
+**Fields (strict; `ownerId`, `userId`, `bookId`, `_id`, `readingStatus`, `createdAt` and any other field are rejected as `Unknown field`):**
+
+| Field         | Rules                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `status`      | `in_progress` (default on create) or `completed`; cannot be `null`                                                   |
+| `progress`    | exactly one metric: `pages` integer 0–100,000, `chapters` integer 0–10,000 or `percent` integer 0–100; no extra keys |
+| `startedOn`   | existing calendar date `YYYY-MM-DD` (year 0001–9999; `2026-02-30` is rejected), stored and returned exactly as sent  |
+| `completedOn` | as `startedOn`; only on a completed session, and on or after `startedOn` when both are set                           |
+| `rating`      | integer 1–5                                                                                                          |
+| `summary`     | trimmed, 1–5,000 characters; a short personal summary, not the notes feature                                         |
+
+- **Create:** every field is optional; an empty or missing body starts an in-progress session. `"status": "completed"` records an earlier read in one request, and needs no date, rating, summary or progress. `null` is not accepted on create.
+- **PATCH:** omitted fields are unchanged; `null` clears `progress`, `startedOn`, `completedOn`, `rating` or `summary`. The date rules are checked against the **resulting** session, so for example setting `completedOn` on an in-progress session without completing it fails with detail `{ "field": "completedOn", "message": "can only be set on a completed reading session" }`, and a completion before the start fails with `{ "field": "completedOn", "message": "must be on or after startedOn" }`.
+- **Progress limits:** when progress is set (on create or PATCH), a `pages` value may not exceed the book's current `pageCount` and a `chapters` value may not exceed its `chapterCount` (detail `{ "field": "progress.value", "message": "must not exceed the book's page count" }` or `... chapter count`). Unknown counts impose no limit beyond the ranges above, and percent is never compared with book metadata. Progress already stored is never rewritten when a book's counts later change, so historical progress may exceed a reduced count. Reaching the end never completes a session.
+- **Dates are calendar days:** no time zone conversion is applied, and no date is ever filled in automatically (finishing does not set `completedOn`).
+
+**State machine:**
+
+- `in_progress → completed` via PATCH `{ "status": "completed" }` (optionally with completion details).
+- `completed` is final for status: `{ "status": "in_progress" }` on a completed session returns `409 { "error": { "code": "INVALID_READING_TRANSITION", "message": "A completed reading session cannot be reopened; start a new session to reread the book", "requestId": "<id>" } }`. Ratings, summaries, progress and dates of a completed session can still be corrected.
+- **One in-progress session per book**, enforced by a partial unique database index: starting another returns `409 { "error": { "code": "READING_SESSION_IN_PROGRESS", "message": "This book already has a reading session in progress", "requestId": "<id>" } }`. Any number of completed sessions is allowed, including recording a completed one while a read is in progress. Finishing the active session frees the slot for a reread.
+- **Concurrent edits:** each PATCH is validated against the version of the session it writes to; a concurrent change makes the server re-read and re-validate (so the request may then fail with `400` or `409 INVALID_READING_TRANSITION`). If the session keeps changing for five attempts, the request fails with `409 READING_SESSION_UPDATE_CONFLICT` and can be retried.
+
+**Overview:** `status` is `reading` while a session is in progress (even if earlier reads were completed), otherwise `completed` if any session is completed, otherwise `unread`. `lastCompletedSession` is the most recently **created** completed session (ties broken by `id`); `completedOn` is never guessed.
+
+**History query** (both list endpoints; each parameter at most once, unknown parameters rejected): `page` ≥ 1 (default 1), `limit` 1–100 (default 20), optional `status` (`in_progress` | `completed`), `sort` `recent` (default) or `oldest` by creation time with `id` as tie-breaker. Empty history returns `data: []` with `totalPages: 0`.
+
+**Visibility:** a session is visible only while it belongs to the reader **and** its book is one of the reader's active books. A missing session, another reader's session and a session of a deleted book all return the same `404 "Reading session not found"`; book-scoped endpoints return `404 "Book not found"` for a missing, deleted or foreign book. `GET /reading-sessions` excludes sessions of deleted books **before** counting and paging, so totals and pages are exact. Deleting a book keeps all its sessions stored.
 
 ### Responses on any path
 
