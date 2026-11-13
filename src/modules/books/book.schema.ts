@@ -1,12 +1,16 @@
 import { z } from 'zod';
-import { collapseWhitespace, containsLetterOrDigit } from './book.normalization.js';
+import {
+  limitQueryParameter,
+  objectIdSchema,
+  pageQueryParameter,
+  singleQueryChoice,
+  singleQueryValue,
+  requiringAtLeastOneChange,
+} from '../../shared/request-schemas.js';
+import { collapseWhitespace, containsLetterOrDigit } from '../../shared/text.js';
 
 export const BOOK_FORMATS = ['physical', 'ebook'] as const;
 const BOOK_SORT_ORDERS = ['recent', 'oldest', 'title_asc', 'title_desc'] as const;
-
-const OBJECT_ID_HEX = /^[0-9a-fA-F]{24}$/;
-const POSITIVE_WHOLE_NUMBER = /^[1-9][0-9]*$/;
-const ONLY_ONCE = 'must be given only once';
 
 const title = z.string().transform(collapseWhitespace).pipe(z.string().min(1).max(250));
 const author = z.string().trim().min(1).max(120);
@@ -41,8 +45,8 @@ export const createBookRequestSchema = z.strictObject({
   publicationYear: publicationYear.optional(),
 });
 
-export const updateBookRequestSchema = z
-  .strictObject({
+export const updateBookRequestSchema = requiringAtLeastOneChange(
+  z.strictObject({
     title: title.optional(),
     authors: authors.optional(),
     format: format.optional(),
@@ -53,28 +57,12 @@ export const updateBookRequestSchema = z
     pageCount: pageCount.nullable().optional(),
     chapterCount: chapterCount.nullable().optional(),
     publicationYear: publicationYear.nullable().optional(),
-  })
-  .refine((changes) => Object.keys(changes).length > 0, 'must change at least one field');
-
-const singleQueryValue = z.string({
-  error: (issue) => (Array.isArray(issue.input) ? ONLY_ONCE : 'must be a single text value'),
-});
-
-function singleQueryChoice<const Choices extends readonly [string, ...string[]]>(choices: Choices) {
-  return z.enum(choices, {
-    error: (issue) =>
-      Array.isArray(issue.input) ? ONLY_ONCE : `must be one of: ${choices.join(', ')}`,
-  });
-}
-
-const positiveWholeNumber = singleQueryValue
-  .regex(POSITIVE_WHOLE_NUMBER, 'must be a positive whole number')
-  .transform(Number)
-  .pipe(z.number().int('is too large'));
+  }),
+);
 
 export const listBooksQuerySchema = z.strictObject({
-  page: positiveWholeNumber.default(1),
-  limit: positiveWholeNumber.pipe(z.number().max(100)).default(20),
+  page: pageQueryParameter,
+  limit: limitQueryParameter,
   q: singleQueryValue
     .trim()
     .max(120)
@@ -95,7 +83,7 @@ export const duplicateCheckQuerySchema = z
   );
 
 export const bookIdParamsSchema = z.strictObject({
-  bookId: z.string().regex(OBJECT_ID_HEX, 'must be a 24-character hexadecimal id'),
+  bookId: objectIdSchema,
 });
 
 export type NewBook = z.output<typeof createBookRequestSchema>;
