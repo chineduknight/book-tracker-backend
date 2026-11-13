@@ -50,10 +50,10 @@ run **Register** first.
 
 ## Books requests
 
-The **Books**, **Locations**, **Copies** and **Reading** folders each start by registering their
-own disposable reader (`booksAccessToken`, `locationsAccessToken`, `copiesAccessToken`,
-`readingAccessToken`) and create
-their own books and locations. None reuses the Auth folder's tokens, which that folder
+The **Books**, **Locations**, **Copies**, **Reading** and **Notes** folders each start by
+registering their own disposable reader (`booksAccessToken`, `locationsAccessToken`,
+`copiesAccessToken`, `readingAccessToken`, `notesAccessToken`) and create their own books,
+locations and reading sessions. None reuses the Auth folder's tokens, which that folder
 deliberately logs out, so each folder runs reliably on its own or as part of the whole collection.
 
 ## Repeatable runs: `npm run api:smoke`
@@ -79,13 +79,17 @@ Because it deletes data, the runner fails before connecting to anything unless:
 Failures print only the runner's own messages or an error's name and code, never connection
 strings.
 
+A local address does not prove the database is disposable: an SSH tunnel or port forward on
+`localhost` can lead to a remote server, and the runner cannot tell. Only run `api:smoke` when you
+know the MongoDB listening locally is a throwaway instance, as in CI.
+
 ```bash
 npm run api:smoke
 # optional: MONGODB_SMOKE_URI=mongodb://127.0.0.1:27017/book-tracker-smoke SMOKE_PORT=3100
 ```
 
 `npm run api:test` runs the collection against an API you started yourself (for example
-`npm run dev`). A full run makes eight registration attempts (three in Auth, one in each other
+`npm run dev`). A full run makes nine registration attempts (three in Auth, one in each other
 folder), so against a long-running API only about two full runs fit in the hourly per-address
 registration limit; restart the API or use `api:smoke`.
 

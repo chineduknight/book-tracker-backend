@@ -9,9 +9,9 @@ what they thought of it. This API lets each user keep a private library: book ti
 copies they own, reading sessions (including rereads), searchable general and chapter notes, and
 lending history. Ebooks can be catalogued without storing any files.
 
-This repository currently contains the **foundation only** (PR #1): app assembly, configuration,
-MongoDB lifecycle, health/readiness probes, error handling, tests, CI and the Bruno collection.
-No product endpoints exist yet.
+The API currently covers accounts and sessions, the private book catalogue, storage locations and
+physical copies, reading sessions with rereads, and notes and highlights with owner-scoped text
+search. Lending and data export are still to come (see [Upcoming PRs](#upcoming-prs)).
 
 ## Stack
 
@@ -21,9 +21,9 @@ No product endpoints exist yet.
 | Language        | TypeScript (strict), ES modules                               |
 | HTTP            | Express 5                                                     |
 | Database        | MongoDB via Mongoose                                          |
-| Validation      | Zod (environment now; request bodies in later modules)        |
+| Validation      | Zod (environment, request bodies, query and route parameters) |
 | Logging         | pino / pino-http (structured JSON, sensitive values redacted) |
-| Tests           | Vitest + Supertest (no database or secrets required)          |
+| Tests           | Vitest + Supertest; integration tests against a real MongoDB  |
 | API docs        | [Bruno](bruno/README.md) collection (`.bru` files)            |
 | Lint / format   | ESLint (typescript-eslint, type-aware) + Prettier             |
 | Package manager | npm with committed `package-lock.json`                        |
@@ -132,6 +132,12 @@ preflight and request-body errors.
 | GET    | `/api/v1/reading-sessions`               | All of the reader's reading history (paginated)                        |
 | GET    | `/api/v1/reading-sessions/:sessionId`    | One reading session                                                    |
 | PATCH  | `/api/v1/reading-sessions/:sessionId`    | Record progress, finish, or correct a session                          |
+| POST   | `/api/v1/books/:bookId/notes`            | Add a note or highlight, optionally linked to a session (201)          |
+| GET    | `/api/v1/books/:bookId/notes`            | One book's notes: filter by kind, chapter, session or words            |
+| GET    | `/api/v1/notes`                          | All of the reader's notes, with the same filters plus `bookId`         |
+| GET    | `/api/v1/notes/:noteId`                  | One note or highlight                                                  |
+| PATCH  | `/api/v1/notes/:noteId`                  | Change text, title, commentary, chapter or page; `null` clears         |
+| DELETE | `/api/v1/notes/:noteId`                  | Soft-delete a note (204)                                               |
 
 Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
 token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
@@ -156,6 +162,7 @@ src/
 ├── modules/copies/        # physical copies of physical books
 ├── modules/locations/     # reader-owned storage locations
 ├── modules/reading/       # reading sessions, rereads and the derived reading overview
+├── modules/notes/         # notes and highlights, optional session links, text search
 ├── modules/health/        # liveness and readiness routes + response DTOs
 ├── modules/users/         # user model, public UserDto, user service
 └── shared/                # AppError, response envelopes, request validation, safe errors
@@ -192,13 +199,13 @@ Included: scaffold, config validation, MongoDB lifecycle, health/readiness, secu
 authentication and user accounts (register, login, refresh, logout, current user), the private
 book catalogue (create, list, search, filter, sort, update, soft delete, duplicate suggestions),
 storage locations and physical copies, reading sessions with rereads and a derived reading
-overview, tests, CI, Bruno.
+overview, notes and highlights (Markdown source, optional session link, owner-scoped text search,
+soft delete), tests, CI, Bruno.
 
-Not included yet: email verification, password reset, OAuth, notes, loans, book restore, location
-deletion, reading-session deletion, UI, deployment.
+Not included yet: email verification, password reset, OAuth, loans, export, tags, book or note
+restore, location deletion, reading-session deletion, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
-2. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
-3. **Export**: full per-user data export.
+1. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
+2. **Export**: full per-user data export.
