@@ -1,6 +1,5 @@
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { createApp } from '../src/app.js';
 import { createLogger } from '../src/config/logger.js';
 import { ALLOWED_ORIGIN, createLogCapture, createTestApp } from './helpers.js';
 
@@ -77,10 +76,7 @@ describe('request ids', () => {
 describe('request logging', () => {
   it('logs method, path and status but not credentials or query strings', async () => {
     const logs = createLogCapture();
-    const app = createApp({
-      logger: createLogger('info', logs.stream),
-      corsOrigins: [ALLOWED_ORIGIN],
-    });
+    const app = createTestApp({ logger: createLogger('info', logs.stream) });
 
     await request(app)
       .get('/api/v1/health?token=query-secret')

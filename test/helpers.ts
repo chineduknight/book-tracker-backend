@@ -1,7 +1,8 @@
+import { randomBytes } from 'node:crypto';
 import { Writable } from 'node:stream';
 import mongoose from 'mongoose';
 import { expect, vi } from 'vitest';
-import { createApp } from '../src/app.js';
+import { createApp, type AppOptions } from '../src/app.js';
 import { createLogger } from '../src/config/logger.js';
 
 export const ALLOWED_ORIGIN = 'http://localhost:5173';
@@ -37,9 +38,16 @@ export function createLogCapture() {
   return { stream, output: () => lines.join('') };
 }
 
-export function createTestApp() {
-  const logger = createLogger('silent');
-  return createApp({ logger, corsOrigins: [ALLOWED_ORIGIN] });
+/** A disposable signing secret generated per test run; never a committed value. */
+export const TEST_ACCESS_TOKEN_SECRET = randomBytes(32);
+
+export function createTestApp(overrides: Partial<AppOptions> = {}) {
+  return createApp({
+    logger: createLogger('silent'),
+    corsOrigins: [ALLOWED_ORIGIN],
+    accessTokenSecret: TEST_ACCESS_TOKEN_SECRET,
+    ...overrides,
+  });
 }
 
 /** Simulate the default Mongoose connection being in a given state without a real database. */

@@ -41,7 +41,13 @@ async function main(): Promise<void> {
   process.on('unhandledRejection', fatalErrorHandler(logger, 'Unhandled promise rejection'));
   process.on('uncaughtException', fatalErrorHandler(logger, 'Uncaught exception'));
 
-  const server = createServer(createApp({ logger, corsOrigins: env.CORS_ORIGIN }));
+  const server = createServer(
+    createApp({
+      logger,
+      corsOrigins: env.CORS_ORIGIN,
+      accessTokenSecret: env.JWT_ACCESS_TOKEN_SECRET,
+    }),
+  );
   server.listen(env.PORT);
   await once(server, 'listening');
   logger.info({ port: env.PORT, nodeEnv: env.NODE_ENV }, 'HTTP server listening');
