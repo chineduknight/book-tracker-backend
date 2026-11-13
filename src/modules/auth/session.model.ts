@@ -6,8 +6,6 @@ export type RevocationReason = (typeof REVOCATION_REASONS)[number];
 const sessionSchema = new Schema(
   {
     userId: { type: Schema.Types.ObjectId, required: true, index: true },
-    refreshTokenHash: { type: String, required: true },
-    consumedRefreshTokenHashes: { type: [String], default: [] },
     expiresAt: { type: Date, required: true },
     lastRotatedAt: { type: Date, default: null },
     revokedAt: { type: Date, default: null },
@@ -16,8 +14,6 @@ const sessionSchema = new Schema(
   { timestamps: { createdAt: true, updatedAt: false }, strict: 'throw' },
 );
 
-sessionSchema.index({ refreshTokenHash: 1 }, { unique: true });
-sessionSchema.index({ consumedRefreshTokenHashes: 1 });
 sessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export const SessionModel = model('Session', sessionSchema);

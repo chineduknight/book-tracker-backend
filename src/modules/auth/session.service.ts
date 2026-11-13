@@ -1,8 +1,9 @@
+import type { Types } from 'mongoose';
+import { RefreshTokenModel } from './refresh-token.model.js';
 import { generateRefreshToken, hashRefreshToken } from './refresh-token.js';
 import { SessionModel, type RevocationReason } from './session.model.js';
 
 const SESSION_LIFETIME_MS = 30 * 24 * 60 * 60 * 1000;
-const RETAINED_CONSUMED_REFRESH_TOKENS = 100;
 
 export interface IssuedRefreshToken {
   userId: string;
@@ -16,34 +17,50 @@ export interface SessionReference {
   sessionId: string;
 }
 
-function activeSessionHolding(refreshTokenHash: string, now: Date) {
-  return { refreshTokenHash, revokedAt: null, expiresAt: { $gt: now } };
+interface SessionRecord {
+  _id: Types.ObjectId;
+  userId: Types.ObjectId;
+  expiresAt: Date;
+}
+
+function activeSession(sessionId: Types.ObjectId | string, now: Date) {
+  return { _id: sessionId, revokedAt: null, expiresAt: { $gt: now } };
 }
 
 function revocation(reason: RevocationReason, now: Date) {
   return { $set: { revokedAt: now, revocationReason: reason } };
 }
 
-async function revokeSessionIfRefreshTokenWasConsumed(refreshTokenHash: string, now: Date) {
+async function issueRefreshToken(session: SessionRecord): Promise<IssuedRefreshToken> {
+  const refreshToken = generateRefreshToken();
+  await RefreshTokenModel.create({
+    sessionId: session._id,
+    tokenHash: hashRefreshToken(refreshToken),
+    expiresAt: session.expiresAt,
+  });
+  return {
+    userId: session.userId.toHexString(),
+    sessionId: session._id.toHexString(),
+    refreshToken,
+    sessionExpiresAt: session.expiresAt,
+  };
+}
+
+async function revokeSessionIfRefreshTokenWasConsumed(tokenHash: string, now: Date) {
+  const consumedToken = await RefreshTokenModel.findOne({ tokenHash, status: 'consumed' }).lean();
+  if (!consumedToken) return;
   await SessionModel.updateOne(
-    { consumedRefreshTokenHashes: refreshTokenHash, revokedAt: null },
+    activeSession(consumedToken.sessionId, now),
     revocation('refresh_token_reuse', now),
   );
 }
 
 export async function startSession(userId: string): Promise<IssuedRefreshToken> {
-  const refreshToken = generateRefreshToken();
   const session = await SessionModel.create({
     userId,
-    refreshTokenHash: hashRefreshToken(refreshToken),
     expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS),
   });
-  return {
-    userId,
-    sessionId: session.id,
-    refreshToken,
-    sessionExpiresAt: session.expiresAt,
-  };
+  return issueRefreshToken(session);
 }
 
 export async function rotateRefreshToken(
@@ -51,54 +68,47 @@ export async function rotateRefreshToken(
 ): Promise<IssuedRefreshToken | null> {
   const now = new Date();
   const presentedHash = hashRefreshToken(presentedRefreshToken);
-  const replacementRefreshToken = generateRefreshToken();
 
-  const session = await SessionModel.findOneAndUpdate(
-    activeSessionHolding(presentedHash, now),
-    {
-      $set: { refreshTokenHash: hashRefreshToken(replacementRefreshToken), lastRotatedAt: now },
-      $push: {
-        consumedRefreshTokenHashes: {
-          $each: [presentedHash],
-          $slice: -RETAINED_CONSUMED_REFRESH_TOKENS,
-        },
-      },
-    },
-    { returnDocument: 'after' },
+  const consumedToken = await RefreshTokenModel.findOneAndUpdate(
+    { tokenHash: presentedHash, status: 'active' },
+    { $set: { status: 'consumed', consumedAt: now } },
   ).lean();
-
-  if (!session) {
+  if (!consumedToken) {
     await revokeSessionIfRefreshTokenWasConsumed(presentedHash, now);
     return null;
   }
-  return {
-    userId: session.userId.toHexString(),
-    sessionId: session._id.toHexString(),
-    refreshToken: replacementRefreshToken,
-    sessionExpiresAt: session.expiresAt,
-  };
+
+  const session = await SessionModel.findOneAndUpdate(
+    activeSession(consumedToken.sessionId, now),
+    { $set: { lastRotatedAt: now } },
+    { returnDocument: 'after' },
+  ).lean();
+  if (!session) return null;
+
+  return issueRefreshToken(session);
 }
 
 export async function revokeSessionByRefreshToken(presentedRefreshToken: string): Promise<boolean> {
   const now = new Date();
   const presentedHash = hashRefreshToken(presentedRefreshToken);
 
+  const activeToken = await RefreshTokenModel.findOne({
+    tokenHash: presentedHash,
+    status: 'active',
+  }).lean();
+  if (!activeToken) {
+    await revokeSessionIfRefreshTokenWasConsumed(presentedHash, now);
+    return false;
+  }
+
   const { modifiedCount } = await SessionModel.updateOne(
-    activeSessionHolding(presentedHash, now),
+    activeSession(activeToken.sessionId, now),
     revocation('logout', now),
   );
-  if (modifiedCount === 1) return true;
-
-  await revokeSessionIfRefreshTokenWasConsumed(presentedHash, now);
-  return false;
+  return modifiedCount === 1;
 }
 
 export async function isSessionActive({ userId, sessionId }: SessionReference): Promise<boolean> {
-  const activeSession = await SessionModel.exists({
-    _id: sessionId,
-    userId,
-    revokedAt: null,
-    expiresAt: { $gt: new Date() },
-  });
-  return activeSession !== null;
+  const session = await SessionModel.exists({ ...activeSession(sessionId, new Date()), userId });
+  return session !== null;
 }

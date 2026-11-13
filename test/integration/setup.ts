@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
+import { RefreshTokenModel } from '../../src/modules/auth/refresh-token.model.js';
 import { SessionModel } from '../../src/modules/auth/session.model.js';
 import { UserModel } from '../../src/modules/users/user.model.js';
 
@@ -16,19 +17,31 @@ function testDatabaseUri(): string {
   return uri;
 }
 
+async function deleteAuthData(): Promise<void> {
+  await Promise.all([
+    UserModel.deleteMany({}),
+    SessionModel.deleteMany({}),
+    RefreshTokenModel.deleteMany({}),
+  ]);
+}
+
 beforeAll(async () => {
   await mongoose.connect(testDatabaseUri(), {
     dbName: TEST_DATABASE_NAME,
     serverSelectionTimeoutMS: 5_000,
   });
-  await Promise.all([UserModel.syncIndexes(), SessionModel.syncIndexes()]);
+  await Promise.all([
+    UserModel.syncIndexes(),
+    SessionModel.syncIndexes(),
+    RefreshTokenModel.syncIndexes(),
+  ]);
 });
 
 beforeEach(async () => {
-  await Promise.all([UserModel.deleteMany({}), SessionModel.deleteMany({})]);
+  await deleteAuthData();
 });
 
 afterAll(async () => {
-  await Promise.all([UserModel.deleteMany({}), SessionModel.deleteMany({})]);
+  await deleteAuthData();
   await mongoose.disconnect();
 });
