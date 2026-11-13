@@ -54,5 +54,36 @@ These rules constrain every future module. Changing one needs an explicit decisi
   window. Pinned in `.nvmrc`, `engines` (with `engine-strict`) and CI via `.nvmrc`.
 - **TypeScript 6.0, not 7.x:** typescript-eslint (type-aware linting) supports TypeScript below
   6.1 only. Upgrade once it supports 7.x.
-- **CORS without credentials:** the API is expected to use bearer tokens, so cookies are not
-  enabled cross-origin. Revisit if cookie-based sessions are chosen in the auth PR.
+- **CORS without credentials:** the API uses bearer tokens, so cookies are not enabled
+  cross-origin. Revisit together with the browser token-storage decision below.
+
+## Authentication decisions
+
+Details and exact responses are in the [API contract](api-contract.md#authentication-and-session-tokens).
+
+- **Bearer tokens in JSON:** register and login return a 15-minute HS256 JWT access token and an
+  opaque refresh token in the response body; refresh and logout take the refresh token in the
+  request body. This suits API clients and Bruno and avoids designing cookie, CSRF and CORS
+  behaviour before the frontend's hosting model is known.
+- **Browser token storage is not decided.** The frontend must not keep refresh tokens in
+  `localStorage` or `sessionStorage`. Before production web sign-in, choose a design (likely an
+  HttpOnly, Secure, SameSite refresh cookie with CSRF protection and an explicit CORS change).
+- **Passwords:** Argon2id via `@node-rs/argon2` with the OWASP minimum parameters
+  (19 MiB memory, 2 iterations, parallelism 1); about 12 ms per hash on a developer laptop.
+  The parameters are stored in each hash, so they can be raised later without breaking logins.
+  Passwords are never trimmed or altered.
+- **Server-side sessions:** each login creates a session record (user, current refresh-token
+  SHA-256 digest, absolute 30-day expiry, revocation fields). Rotation is one atomic
+  `findOneAndUpdate` conditioned on the current digest, so concurrent refreshes cannot both
+  succeed. Protected routes also check that the session is active, so logout is immediate.
+- **Refresh-token reuse revokes the session.** A reused token proves a copy exists somewhere, so
+  the whole session is revoked. The cost: a client that sends two refreshes concurrently loses
+  its session. Only digests of tokens this session actually issued can trigger revocation, so a
+  guessed token cannot revoke anyone else's session.
+- **Registration reveals existing emails** through `409 CONFLICT`. Accepted for the MVP;
+  revisit when email verification is added. Registration is throttled per address.
+- **No email verification yet.** Accounts are active immediately; email ownership is unproven.
+- **Throttling is in memory, per instance** (`express-rate-limit`). With several instances each
+  keeps its own counters, so effective limits multiply; move to a shared store before scaling
+  out. Behind a reverse proxy, configure Express `trust proxy` or every client shares one
+  address bucket.

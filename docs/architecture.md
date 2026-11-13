@@ -34,6 +34,24 @@ Rules for modules:
 Request flow: `request-logger (request id) → helmet → cors → json (100 kB) → /api/v1 router →
 404 → error handler`.
 
+## Authentication and ownership
+
+- `modules/users` owns the `users` collection (unique index on the normalized email) and exposes
+  `createUser`, `findUserCredentialsByNormalizedEmail` and `findUserById`. Only `UserDto` leaves
+  the module, apart from the password hash that login needs.
+- `modules/auth` owns registration, login, sessions (`sessions` collection), token issuance and
+  the `requireAuthenticatedUser` middleware. `app.ts` creates the middleware once and passes it
+  to every router that needs it.
+- **Guarantee of `requireAuthenticatedUser`:** after it runs, `authenticatedUserOf(req)` returns
+  a `userId` and `sessionId` taken from an HS256 access token this API signed (issuer, audience,
+  type and expiry checked) whose session was active at that moment. It does not prove the user
+  record still exists; handlers that load the user must handle a missing one.
+- Future owner-scoped modules derive `ownerId` only from `authenticatedUserOf(req).userId` and
+  never from the path, query or body.
+- Indexes are declared on the schemas and built by Mongoose when the app connects. The
+  integration tests build them before running; a production deployment should build them
+  before traffic arrives.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
@@ -45,6 +63,8 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   logged errors, they are reduced to name and code (see [decisions.md](decisions.md)).
 
 ## Future data model (design notes, not implemented)
+
+`User` and `Session` exist (see above); the remaining models are design notes.
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)
