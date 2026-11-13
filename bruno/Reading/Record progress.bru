@@ -1,0 +1,37 @@
+meta {
+  name: Record progress
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/reading-sessions/{{readingSessionId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+body:json {
+  {
+    "progress": { "unit": "pages", "value": 120 }
+  }
+}
+
+tests {
+  test("records a single progress metric without completing", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.progress).to.eql({ unit: "pages", value: 120 });
+    expect(res.getBody().data.status).to.equal("in_progress");
+  });
+}
+
+docs {
+  # PATCH /api/v1/reading-sessions/:sessionId
+
+  Progress is one metric: `{ "unit": "pages" | "chapters" | "percent", "value": integer }`
+  (pages 0–100,000, chapters 0–10,000, percent 0–100), not above the book's known page or chapter
+  count. Reaching the end never completes the session; completion is explicit.
+}

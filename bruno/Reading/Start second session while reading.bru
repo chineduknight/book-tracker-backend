@@ -1,0 +1,34 @@
+meta {
+  name: Start second session while reading
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/books/{{readingBookId}}/reading-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+body:json {
+  {}
+}
+
+tests {
+  test("returns 409 READING_SESSION_IN_PROGRESS", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error).to.eql({
+      code: "READING_SESSION_IN_PROGRESS",
+      message: "This book already has a reading session in progress",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}
+
+docs {
+  A book has at most one in-progress session, enforced by a partial unique database index.
+}

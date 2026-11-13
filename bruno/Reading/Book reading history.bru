@@ -1,0 +1,39 @@
+meta {
+  name: Book reading history
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/books/{{readingBookId}}/reading-sessions?status=completed&sort=oldest
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: completed
+  sort: oldest
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+tests {
+  test("lists the book's completed sessions oldest first", function () {
+    expect(res.getStatus()).to.equal(200);
+    const sessions = res.getBody().data;
+    expect(sessions).to.have.lengthOf(2);
+    expect(sessions[0].id).to.equal(bru.getVar("readingSessionId"));
+    expect(sessions[0].summary).to.equal("A cosy adventure with a darker last act.");
+    expect(res.getBody().meta.pagination).to.eql({ page: 1, limit: 20, total: 2, totalPages: 1 });
+  });
+}
+
+docs {
+  # GET /api/v1/books/:bookId/reading-sessions
+
+  Query: `page`, `limit` (1–100), `status` (`in_progress` | `completed`), `sort` (`recent`
+  default | `oldest`, by creation time with id as tie-breaker). Unknown or repeated parameters
+  are rejected.
+}

@@ -1,0 +1,36 @@
+meta {
+  name: Finish reading session
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/reading-sessions/{{readingSessionId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+body:json {
+  {
+    "status": "completed",
+    "completedOn": "2026-11-12",
+    "rating": 5,
+    "summary": "A cosy adventure with a darker last act."
+  }
+}
+
+tests {
+  test("completes the session with the optional details", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data).to.include({
+      status: "completed",
+      startedOn: "2026-11-01",
+      completedOn: "2026-11-12",
+      rating: 5,
+    });
+  });
+}

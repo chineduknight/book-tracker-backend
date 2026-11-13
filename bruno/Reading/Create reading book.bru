@@ -1,0 +1,33 @@
+meta {
+  name: Create reading book
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+body:json {
+  {
+    "title": "The Hobbit",
+    "format": "physical",
+    "pageCount": 310
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("readingBookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the book to read", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
