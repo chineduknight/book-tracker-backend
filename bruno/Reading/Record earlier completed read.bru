@@ -1,0 +1,35 @@
+meta {
+  name: Record earlier completed read
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/books/{{readingBookId}}/reading-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+body:json {
+  {
+    "status": "completed"
+  }
+}
+
+tests {
+  test("accepts a completed read without dates, rating, summary or progress", function () {
+    expect(res.getStatus()).to.equal(201);
+    const session = res.getBody().data;
+    expect(session.status).to.equal("completed");
+    expect(session.progress).to.equal(null);
+    expect(session).to.not.have.any.keys("startedOn", "completedOn", "rating", "summary");
+  });
+}
+
+docs {
+  Completion details are optional; no completion date is ever invented.
+}

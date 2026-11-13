@@ -1,0 +1,32 @@
+meta {
+  name: Reopen finished session
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{baseUrl}}/reading-sessions/{{readingSessionId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+body:json {
+  {
+    "status": "in_progress"
+  }
+}
+
+tests {
+  test("returns 409 INVALID_READING_TRANSITION", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error.code).to.equal("INVALID_READING_TRANSITION");
+  });
+}
+
+docs {
+  Completed is final. To read the book again, start a new session.
+}

@@ -1,0 +1,49 @@
+meta {
+  name: Reading overview while reading
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/books/{{readingBookId}}/reading-overview
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+tests {
+  test("derives the reading status from the active session", function () {
+    expect(res.getStatus()).to.equal(200);
+    const overview = res.getBody().data;
+    expect(overview.status).to.equal("reading");
+    expect(overview.totalSessions).to.equal(1);
+    expect(overview.completedSessions).to.equal(0);
+    expect(overview.activeSession.id).to.equal(bru.getVar("readingSessionId"));
+    expect(overview.lastCompletedSession).to.equal(null);
+  });
+}
+
+docs {
+  # GET /api/v1/books/:bookId/reading-overview
+
+  **200 OK**
+
+  ```json
+  {
+    "data": {
+      "bookId": "6735a1f0c2a1b2c3d4e5f607",
+      "status": "reading",
+      "totalSessions": 1,
+      "completedSessions": 0,
+      "activeSession": { "id": "…", "status": "in_progress", "…": "…" },
+      "lastCompletedSession": null
+    }
+  }
+  ```
+
+  `status` is `reading` while a session is in progress, otherwise `completed` if any session is
+  completed, otherwise `unread`.
+}

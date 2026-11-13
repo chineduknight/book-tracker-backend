@@ -26,12 +26,11 @@ function parseOrRejectAsInvalid<Schema extends z.ZodType>(
   const result = schema.safeParse(input);
   if (result.success) return result.data;
 
-  throw new AppError(
-    400,
-    'VALIDATION_ERROR',
-    'The request contains invalid fields',
-    toFieldValidationErrors(result.error.issues, wholeInputField),
-  );
+  throw invalidFieldsError(toFieldValidationErrors(result.error.issues, wholeInputField));
+}
+
+export function invalidFieldsError(details: FieldValidationError[]): AppError {
+  return new AppError(400, 'VALIDATION_ERROR', 'The request contains invalid fields', details);
 }
 
 export function parseRequestBody<Schema extends z.ZodType>(

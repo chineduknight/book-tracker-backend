@@ -1,0 +1,18 @@
+meta {
+  name: Reading history without token
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/reading-sessions
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns 401 UNAUTHENTICATED", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getHeader("www-authenticate")).to.equal("Bearer");
+  });
+}

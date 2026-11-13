@@ -1,0 +1,34 @@
+meta {
+  name: All reading in progress
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/reading-sessions?status=in_progress
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: in_progress
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+tests {
+  test("lists the reader's in-progress sessions across books", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.map((session) => session.id)).to.eql([bru.getVar("rereadSessionId")]);
+    expect(res.getBody().meta.pagination.total).to.equal(1);
+  });
+}
+
+docs {
+  # GET /api/v1/reading-sessions
+
+  The reader's sessions across all active books. Sessions of deleted books are excluded before
+  counting and paging. Same query parameters as the per-book history.
+}

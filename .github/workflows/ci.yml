@@ -58,20 +58,7 @@ jobs:
 
       - run: npm ci
       - run: npm run test:integration
-      - run: npm run build
-
-      - name: Run the Bruno collection against a live API
+      - name: Run the Bruno collection against a fresh API instance
         env:
-          PORT: '3000'
-          MONGODB_URI: mongodb://127.0.0.1:27017/book-tracker-smoke
-          LOG_LEVEL: warn
-        run: |
-          JWT_ACCESS_TOKEN_SECRET="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))")"
-          echo "::add-mask::$JWT_ACCESS_TOKEN_SECRET"
-          export JWT_ACCESS_TOKEN_SECRET
-          node dist/server.js &
-          for attempt in $(seq 1 30); do
-            curl --silent --fail http://127.0.0.1:3000/api/v1/ready > /dev/null && break
-            sleep 1
-          done
-          npm run api:test
+          MONGODB_SMOKE_URI: mongodb://127.0.0.1:27017/book-tracker-smoke
+        run: npm run api:smoke

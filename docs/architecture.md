@@ -92,6 +92,23 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   The book document's internal `hasPhysicalCopyHistory` flag is the single point that copy
   creation and the ebook format change both update atomically.
 
+## Reading sessions
+
+- `modules/reading` owns the `readingsessions` collection and serves
+  `/books/:bookId/reading-sessions`, `/books/:bookId/reading-overview` and `/reading-sessions`
+  from one router, mounted before the books router.
+- It calls the books service for every book check: `requireLengthsOfActiveBook` and
+  `findLengthsOfActiveBook` (visibility plus page and chapter counts for progress validation),
+  `requireActiveBookOwnedByUser`, and `keepDocumentsOfActiveBooks`, an aggregation stage owned by
+  the books module that joins only the owner's active books. The reading module never queries the
+  books collection itself.
+- Indexes: `owner_book_recent` `{ ownerId, bookId, createdAt: -1, _id: -1 }` (one book's history
+  and the overview), `owner_status_recent` `{ ownerId, status, createdAt: -1, _id: -1 }` (global
+  history by status), `owner_recent` `{ ownerId, createdAt: -1, _id: -1 }` (unfiltered global
+  history) and the partial unique `owner_book_single_in_progress`.
+- PATCH uses compare-and-set on the internal `revision` field; see
+  [decisions.md](decisions.md#reading-decisions).
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
@@ -104,8 +121,8 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 
 ## Future data model (design notes, not implemented)
 
-`User`, `Session`, `RefreshToken`, `Book`, `StorageLocation` and `PhysicalCopy` exist (see
-above); the remaining models are design notes.
+`User`, `Session`, `RefreshToken`, `Book`, `StorageLocation`, `PhysicalCopy` and
+`ReadingSession` exist (see above); the remaining models are design notes.
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)

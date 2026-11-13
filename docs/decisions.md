@@ -149,6 +149,13 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
 - **Deleting a book keeps its copies.** Copy records, including their location, stay unchanged;
   every copy endpoint hides them while the parent book is deleted. A copy created while its book
   is being deleted concurrently may be persisted, but it is hidden in the same way.
+- **Copy writes and book deletion are not one atomic step.** Copy PATCH and DELETE check that the
+  parent book is active and then write the copy; a book deletion landing between the two still
+  lets that one write complete. The copy remains hidden afterwards and no history is lost.
+  Strictly excluding writes after deletion would need transactions or extra coordination;
+  revisit this when book restore, loans or long-lived history make it matter.
+- **Recovery for a stranded `hasPhysicalCopyHistory` flag** is an operator procedure, not an API
+  feature: see [operations.md](operations.md). There is deliberately no user-facing reset.
 - **Copies are soft-deleted** for future lending history; there are no stored lending flags.
 - **Locations are per reader, unique by normalized name** (whitespace collapsed, NFC, lowercased)
   through a unique index, so concurrent creates and renames cannot produce duplicates. A missing
@@ -157,3 +164,43 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
   policy is not designed; a destructive delete would be misleading.
 - **Unassigned is `null`.** A copy without a location returns `locationId: null`; no default
   location is invented.
+
+## Reading decisions
+
+- **A reading session is one reading of a book**, attached to the book (not a copy), for
+  physical books and ebooks alike. Rereading creates a new session; earlier sessions and their
+  details are never overwritten. Nothing creates a session implicitly.
+- **Reading status is derived, never stored.** Books have no `readingStatus` or counters; the
+  overview computes `unread`, `reading` or `completed` from sessions. The Book DTO is unchanged.
+- **Completion is explicit and its details are optional** (invariant 5). Reaching the last page or
+  100% does not complete a session, and finishing never fills in `completedOn`.
+- **Completed is final.** A completed session can be corrected (rating, summary, dates, progress)
+  but never reopened; a reread is a new session. There is no session deletion endpoint, so history
+  cannot disappear by accident.
+- **One in-progress session per book** is enforced by the partial unique index
+  `owner_book_single_in_progress` (`{ ownerId, bookId }` where `status: 'in_progress'`); a
+  duplicate-key error becomes `409 READING_SESSION_IN_PROGRESS`, not a pre-check.
+- **Progress is a single snapshot** (`pages`, `chapters` or `percent`), never converted between
+  units. New progress is checked against the book's current page or chapter count when it is set;
+  stored progress is not rewritten if the book's counts change later, so history may exceed a
+  reduced count.
+- **Dates are calendar days** (`YYYY-MM-DD`), validated as real Gregorian dates and stored as
+  sent, with no time zone conversion.
+- **Concurrent PATCHes use compare-and-set on a revision counter.** The service reads the session,
+  validates the merged result (date order, completion-only dates, no reopening) and writes only if
+  the session's `revision` is unchanged, incrementing it. A concurrent change makes it re-read and
+  re-validate (up to five attempts, then `409 READING_SESSION_UPDATE_CONFLICT`). This keeps
+  cross-field rules true without transactions.
+- **Deleted books hide their sessions without deleting them.** Global history filters out
+  sessions of deleted books inside one aggregation (an owner-scoped `$lookup` provided by the books
+  service) before counting and paging, so totals are exact. A session started while its book is
+  being deleted may be stored but stays hidden, matching the copy policy.
+- **Repeatable API smoke runs use a fresh API instance.** `npm run api:smoke` builds, resets the
+  dedicated `book-tracker-smoke` database, starts the API on its own port with a generated signing
+  secret, runs the whole Bruno collection and stops the API. Each run therefore starts with fresh
+  in-memory rate limits, without weakening the limits themselves. CI uses the same script.
+  Because it drops a database, it only accepts a single local `mongodb://` host with the smoke
+  database and an allowlist of options (no SRV, remote hosts, replica-set discovery or proxies;
+  `directConnection=true` is enforced), refuses a busy port before resetting anything, waits for
+  the API process it started to report listening before trusting `/ready`, and prints only safe
+  error names and codes.

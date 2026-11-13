@@ -5,6 +5,7 @@ import { SessionModel } from '../../src/modules/auth/session.model.js';
 import { BookModel } from '../../src/modules/books/book.model.js';
 import { PhysicalCopyModel } from '../../src/modules/copies/copy.model.js';
 import { LocationModel } from '../../src/modules/locations/location.model.js';
+import { ReadingSessionModel } from '../../src/modules/reading/reading.model.js';
 import { UserModel } from '../../src/modules/users/user.model.js';
 
 const TEST_DATABASE_NAME = 'book-tracker-test';
@@ -28,6 +29,7 @@ async function deleteAuthData(): Promise<void> {
     BookModel.deleteMany({}),
     LocationModel.deleteMany({}),
     PhysicalCopyModel.deleteMany({}),
+    ReadingSessionModel.deleteMany({}),
   ]);
 }
 
@@ -43,6 +45,7 @@ beforeAll(async () => {
     BookModel.syncIndexes(),
     LocationModel.syncIndexes(),
     PhysicalCopyModel.syncIndexes(),
+    ReadingSessionModel.syncIndexes(),
   ]);
 });
 

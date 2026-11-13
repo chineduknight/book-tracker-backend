@@ -14,7 +14,8 @@ bruno/
 ├── Auth/                   # register, login, current user, refresh, logout (+ error cases)
 ├── Books/                  # catalogue create, duplicate check, list/search, get, update, delete
 ├── Locations/              # storage locations: create, duplicate, list, get, rename
-└── Copies/                 # physical copies: create, ebook/format conflicts, list, update, delete
+├── Copies/                 # physical copies: create, ebook/format conflicts, list, update, delete
+└── Reading/                # reading sessions: start, progress, finish, reread, history, overview
 ```
 
 ## Use the desktop app
@@ -49,16 +50,44 @@ run **Register** first.
 
 ## Books requests
 
-The **Books**, **Locations** and **Copies** folders each start by registering their own
-disposable reader (`booksAccessToken`, `locationsAccessToken`, `copiesAccessToken`) and create
+The **Books**, **Locations**, **Copies** and **Reading** folders each start by registering their
+own disposable reader (`booksAccessToken`, `locationsAccessToken`, `copiesAccessToken`,
+`readingAccessToken`) and create
 their own books and locations. None reuses the Auth folder's tokens, which that folder
 deliberately logs out, so each folder runs reliably on its own or as part of the whole collection.
 
-## Rate limits during runs
+## Repeatable runs: `npm run api:smoke`
 
-A full run creates four accounts and makes six registration attempts (three in Auth, one each in
-Books, Locations and Copies). They count towards the per-address registration limit (20 per
-hour), so about three full runs fit in an hour. Restarting the API resets the in-memory limits.
+`npm run api:smoke` is the recommended way to run the whole collection repeatedly. It builds the
+API, drops and recreates only the dedicated `book-tracker-smoke` database, starts a fresh API on
+port 3100 with a generated signing secret, runs the whole collection against it and stops the API.
+Every run therefore starts from a clean state with fresh in-memory rate limits, so repeated runs
+never hit the per-address registration limit and the limits themselves stay unchanged. CI runs the
+same command.
+
+Because it deletes data, the runner fails before connecting to anything unless:
+
+- `MONGODB_SMOKE_URI` is a plain `mongodb://` URI with exactly one local host (`127.0.0.1`,
+  `localhost` or `[::1]`), the `book-tracker-smoke` database and only harmless options
+  (`appName`, `authMechanism`, `authSource`, `connectTimeoutMS`, `directConnection`,
+  `serverSelectionTimeoutMS`). `mongodb+srv://`, remote or multiple hosts, replica-set discovery
+  and proxies are refused, and both the reset and the API use `directConnection=true`. There is no
+  remote opt-in.
+- `SMOKE_PORT` is free. A port that is already in use stops the run before the reset, and Bruno
+  only starts after the API process this run started reports that it is listening on that port.
+
+Failures print only the runner's own messages or an error's name and code, never connection
+strings.
+
+```bash
+npm run api:smoke
+# optional: MONGODB_SMOKE_URI=mongodb://127.0.0.1:27017/book-tracker-smoke SMOKE_PORT=3100
+```
+
+`npm run api:test` runs the collection against an API you started yourself (for example
+`npm run dev`). A full run makes eight registration attempts (three in Auth, one in each other
+folder), so against a long-running API only about two full runs fit in the hourly per-address
+registration limit; restart the API or use `api:smoke`.
 
 ## Secrets
 

@@ -1,0 +1,16 @@
+meta {
+  name: Reading
+  seq: 7
+}
+
+docs {
+  # Reading sessions
+
+  A reading session is one distinct reading of a book. Rereading starts a new session; earlier
+  sessions are never overwritten. A book's reading status (`unread`, `reading`, `completed`) is
+  derived from its sessions by **Reading overview**; books never store it.
+
+  Run the folder in order. **Register reading reader** creates its own disposable account and the
+  folder creates its own book, so it is independent of every other folder.
+  Contract: `docs/api-contract.md` ("Reading sessions").
+}

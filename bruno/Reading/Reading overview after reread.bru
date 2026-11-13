@@ -1,0 +1,27 @@
+meta {
+  name: Reading overview after reread
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/books/{{readingBookId}}/reading-overview
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+tests {
+  test("is reading again while keeping both completed reads", function () {
+    expect(res.getStatus()).to.equal(200);
+    const overview = res.getBody().data;
+    expect(overview.status).to.equal("reading");
+    expect(overview.totalSessions).to.equal(3);
+    expect(overview.completedSessions).to.equal(2);
+    expect(overview.activeSession.id).to.equal(bru.getVar("rereadSessionId"));
+    expect(overview.lastCompletedSession.status).to.equal("completed");
+  });
+}

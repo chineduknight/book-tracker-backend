@@ -1,0 +1,22 @@
+meta {
+  name: Get reading session
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/reading-sessions/{{readingSessionId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+tests {
+  test("returns the earlier session unchanged by the reread", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data).to.include({ status: "completed", rating: 5, completedOn: "2026-11-12" });
+  });
+}

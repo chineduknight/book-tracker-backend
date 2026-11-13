@@ -1,0 +1,71 @@
+meta {
+  name: Start reading session
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/books/{{readingBookId}}/reading-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+body:json {
+  {
+    "startedOn": "2026-11-01"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("readingSessionId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public ReadingSessionDto", function () {
+    expect(res.getStatus()).to.equal(201);
+    const session = res.getBody().data;
+    expect(session).to.eql({
+      id: session.id,
+      bookId: bru.getVar("readingBookId"),
+      status: "in_progress",
+      progress: null,
+      startedOn: "2026-11-01",
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+    });
+    expect(res.getHeader("location")).to.equal(`/api/v1/reading-sessions/${session.id}`);
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/books/:bookId/reading-sessions
+
+  Starts a reading of one of the reader's active books (physical or ebook). All fields are
+  optional and the body may be empty: `status` (`in_progress` default, or `completed` to record an
+  earlier read), `progress`, `startedOn`, `completedOn` (completed sessions only, on or after
+  `startedOn`), `rating` (1–5) and `summary` (1–5,000 characters).
+
+  **201 Created**, `Location: /api/v1/reading-sessions/{id}`
+
+  ```json
+  {
+    "data": {
+      "id": "6735a1f0c2a1b2c3d4e5f610",
+      "bookId": "6735a1f0c2a1b2c3d4e5f607",
+      "status": "in_progress",
+      "progress": null,
+      "startedOn": "2026-11-01",
+      "createdAt": "2026-11-13T10:30:00.000Z",
+      "updatedAt": "2026-11-13T10:30:00.000Z"
+    }
+  }
+  ```
+
+  **Errors**: `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found",
+  `409 READING_SESSION_IN_PROGRESS`.
+}

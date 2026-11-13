@@ -1,0 +1,32 @@
+meta {
+  name: Start reread
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/books/{{readingBookId}}/reading-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{readingAccessToken}}
+}
+
+body:json {
+  {
+    "startedOn": "2026-11-13"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("rereadSessionId", res.getBody().data.id);
+}
+
+tests {
+  test("starts a new session for the reread", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.id).to.not.equal(bru.getVar("readingSessionId"));
+  });
+}

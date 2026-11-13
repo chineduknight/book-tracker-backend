@@ -1,3 +1,4 @@
+import mongoose, { type PipelineStage } from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
 import { AppError } from '../../shared/errors.js';
 import { toPublicBook, type BookDto, type DuplicateSuggestionDto } from './book.dto.js';
@@ -80,6 +81,59 @@ export async function reserveBookForPhysicalCopy(ownerId: string, bookId: string
 
 export async function requireActiveBookOwnedByUser(ownerId: string, bookId: string) {
   if (!(await isActiveBookOwnedByUser(ownerId, bookId))) throw bookNotFoundError();
+}
+
+export interface BookLengths {
+  pageCount?: number;
+  chapterCount?: number;
+}
+
+/** Page and chapter counts of an active book of the owner, or null if the book is not visible. */
+export async function findLengthsOfActiveBook(
+  ownerId: string,
+  bookId: string,
+): Promise<BookLengths | null> {
+  const book = await BookModel.findOne(activeBookOwnedBy(ownerId, bookId))
+    .select({ pageCount: 1, chapterCount: 1 })
+    .lean();
+  if (!book) return null;
+  return {
+    ...(book.pageCount != null && { pageCount: book.pageCount }),
+    ...(book.chapterCount != null && { chapterCount: book.chapterCount }),
+  };
+}
+
+export async function requireLengthsOfActiveBook(
+  ownerId: string,
+  bookId: string,
+): Promise<BookLengths> {
+  const lengths = await findLengthsOfActiveBook(ownerId, bookId);
+  if (!lengths) throw bookNotFoundError();
+  return lengths;
+}
+
+/**
+ * Aggregation stage that keeps only documents whose `bookIdField` refers to an active book of the
+ * owner, so other modules can filter by parent visibility before counting and paginating.
+ */
+export function keepDocumentsOfActiveBooks(ownerId: string, bookIdField: string): PipelineStage[] {
+  const activeBook = 'activeBook';
+  return [
+    {
+      $lookup: {
+        from: BookModel.collection.collectionName,
+        localField: bookIdField,
+        foreignField: '_id',
+        pipeline: [
+          { $match: { ownerId: new mongoose.Types.ObjectId(ownerId), deletedAt: null } },
+          { $project: { _id: 1 } },
+        ],
+        as: activeBook,
+      },
+    },
+    { $match: { [activeBook]: { $ne: [] } } },
+    { $project: { [activeBook]: 0 } },
+  ];
 }
 
 function toBookUpdate(changes: BookChanges) {
