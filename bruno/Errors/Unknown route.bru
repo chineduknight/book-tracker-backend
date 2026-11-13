@@ -13,9 +13,31 @@ get {
 assert {
   res.status: eq 404
   res.body.error.code: eq "NOT_FOUND"
+  res.body.error.message: eq "Route not found"
   res.body.error.requestId: isString
 }
 
+tests {
+  test("requestId in the body matches the X-Request-Id header", function () {
+    expect(res.getBody().error.requestId).to.equal(res.getHeader("x-request-id"));
+  });
+}
+
 docs {
-  Demonstrates the standard error envelope returned for unknown routes.
+  # Any unmatched route
+
+  Every method on a path with no route, including a known path with an unsupported method,
+  returns 404 with the standard error envelope:
+
+  ```json
+  {
+    "error": {
+      "code": "NOT_FOUND",
+      "message": "Route not found",
+      "requestId": "c10e79cf-2e60-4a2c-9f35-1ca9cf5bfcb3"
+    }
+  }
+  ```
+
+  Contract: `docs/api-contract.md`, "Responses on any path".
 }

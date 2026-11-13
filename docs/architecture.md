@@ -21,7 +21,9 @@ src/
 
 Rules for modules:
 
-- A module owns its routes, request validation (Zod), service logic and Mongoose models.
+- A module owns its routes, request validation (Zod), public response DTOs (for example
+  `modules/health/health.dto.ts`), service logic and Mongoose models. DTOs follow the shared
+  envelopes in `shared/api-response.ts` and the [API contract](api-contract.md).
 - Modules are mounted under `/api/v1` in `app.ts`.
 - Other modules use a module through its exported service functions, never by reaching into its
   models directly.

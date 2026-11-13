@@ -22,6 +22,27 @@ describe('CORS', () => {
     expect(res.headers['access-control-allow-credentials']).toBeUndefined();
   });
 
+  it('answers preflight requests with 204 and no body', async () => {
+    const res = await request(createTestApp())
+      .options('/api/v1/health')
+      .set('Origin', ALLOWED_ORIGIN)
+      .set('Access-Control-Request-Method', 'GET');
+
+    expect(res.status).toBe(204);
+    expect(res.text).toBe('');
+    expect(res.headers['access-control-allow-origin']).toBe(ALLOWED_ORIGIN);
+  });
+
+  it('answers preflight from other origins with 204 but no CORS allowance', async () => {
+    const res = await request(createTestApp())
+      .options('/api/v1/health')
+      .set('Origin', 'https://evil.example')
+      .set('Access-Control-Request-Method', 'GET');
+
+    expect(res.status).toBe(204);
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
   it('does not allow other origins', async () => {
     const res = await request(createTestApp())
       .get('/api/v1/health')

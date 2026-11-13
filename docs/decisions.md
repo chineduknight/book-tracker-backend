@@ -38,7 +38,9 @@ These rules constrain every future module. Changing one needs an explicit decisi
 - **Bruno instead of Swagger/OpenAPI** for API documentation and executable examples, committed
   as `.bru` files beside the code.
 - **Response envelope:** `{ data }` for success, `{ error: { code, message, requestId, details? } }`
-  for errors. Unexpected errors are reported as a generic 500.
+  for errors. Unexpected errors are reported as a generic 500. Status codes, envelopes,
+  pagination, dates and IDs are specified in the [API contract](api-contract.md); the envelope
+  types live in `src/shared/api-response.ts`.
 - **Error logging is allowlisted:** errors are always logged under `err`, which the logger reduces
   to the error class name and a machine-readable code (for example `ECONNREFUSED`). Messages,
   stacks and causes are never logged because they can embed credentials or MongoDB connection

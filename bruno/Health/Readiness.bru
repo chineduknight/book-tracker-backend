@@ -15,20 +15,54 @@ tests {
     expect([200, 503]).to.include(res.getStatus());
   });
 
-  test("uses the matching response envelope", function () {
+  test("returns exactly the documented body for its status", function () {
     const body = res.getBody();
     if (res.getStatus() === 200) {
-      expect(body.data).to.eql({ status: "ready", checks: { database: "connected" } });
-    } else {
-      expect(body.error.code).to.equal("SERVICE_UNAVAILABLE");
-      expect(body.error.requestId).to.be.a("string");
+      expect(body).to.eql({ data: { status: "ready", checks: { database: "connected" } } });
+      return;
     }
+    expect(body).to.eql({
+      error: {
+        code: "SERVICE_UNAVAILABLE",
+        message: "Service is not ready: database is not connected",
+        requestId: res.getHeader("x-request-id"),
+      },
+    });
+  });
+
+  test("is not cacheable and carries a request id", function () {
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+    expect(res.getHeader("x-request-id")).to.be.a("string").and.not.be.empty;
   });
 }
 
 docs {
-  Readiness probe. Returns 200 only while MongoDB is connected; otherwise 503 with
-  `{ "error": { "code": "SERVICE_UNAVAILABLE", ... } }`.
+  # GET /api/v1/ready
+
+  Readiness probe. Returns 200 only while MongoDB is fully connected; otherwise 503
+  (disconnected, connecting or disconnecting). No authentication. `HEAD` returns the same
+  status without a body. Both responses send `Cache-Control: no-store`.
+
+  **200 OK**
+
+  ```json
+  { "data": { "status": "ready", "checks": { "database": "connected" } } }
+  ```
+
+  **503 Service Unavailable**
+
+  ```json
+  {
+    "error": {
+      "code": "SERVICE_UNAVAILABLE",
+      "message": "Service is not ready: database is not connected",
+      "requestId": "c10e79cf-2e60-4a2c-9f35-1ca9cf5bfcb3"
+    }
+  }
+  ```
 
   Stop MongoDB (or point `MONGODB_URI` at an unused port) to see the 503 response.
+
+  DTO: `ReadinessResponseBody` in `src/modules/health/health.dto.ts`; error body:
+  `ErrorResponseBody` in `src/shared/errors.ts`. Contract: `docs/api-contract.md`.
 }

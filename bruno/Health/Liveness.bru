@@ -16,6 +16,35 @@ assert {
   res.body.data.timestamp: isString
 }
 
+tests {
+  test("returns exactly the liveness DTO", function () {
+    expect(Object.keys(res.getBody())).to.eql(["data"]);
+    expect(Object.keys(res.getBody().data)).to.have.members(["status", "timestamp"]);
+  });
+
+  test("timestamp is an ISO 8601 UTC string", function () {
+    const timestamp = res.getBody().data.timestamp;
+    expect(new Date(timestamp).toISOString()).to.equal(timestamp);
+  });
+
+  test("is not cacheable and carries a request id", function () {
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+    expect(res.getHeader("x-request-id")).to.be.a("string").and.not.be.empty;
+  });
+}
+
 docs {
+  # GET /api/v1/health
+
   Liveness probe. Returns 200 whenever the process is serving HTTP, even if MongoDB is down.
+  No authentication. `HEAD` returns the same status without a body.
+
+  **200 OK** (`Cache-Control: no-store`)
+
+  ```json
+  { "data": { "status": "ok", "timestamp": "2026-11-13T10:30:00.000Z" } }
+  ```
+
+  DTO: `LivenessResponseBody` in `src/modules/health/health.dto.ts`.
+  Contract: `docs/api-contract.md`, "Existing endpoints".
 }
