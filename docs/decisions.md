@@ -38,7 +38,11 @@ These rules constrain every future module. Changing one needs an explicit decisi
 - **Bruno instead of Swagger/OpenAPI** for API documentation and executable examples, committed
   as `.bru` files beside the code.
 - **Response envelope:** `{ data }` for success, `{ error: { code, message, requestId, details? } }`
-  for errors. Unexpected errors are reported as a generic 500; internals stay in server logs.
+  for errors. Unexpected errors are reported as a generic 500.
+- **Error logging is allowlisted:** errors are always logged under `err`, which the logger reduces
+  to the error class name and a machine-readable code (for example `ECONNREFUSED`). Messages,
+  stacks and causes are never logged because they can embed credentials or MongoDB connection
+  strings, and field redaction cannot see inside them. Use the request id to correlate.
 - **Liveness vs readiness:** `/health` never depends on MongoDB; `/ready` is 200 only while the
   Mongoose connection is fully connected.
 - **Search:** owner-scoped MongoDB text indexes. No separate search service unless it becomes

@@ -9,20 +9,17 @@ export function isDatabaseConnected(): boolean {
   return mongoose.connection.readyState === mongoose.ConnectionStates.connected;
 }
 
-/** Driver errors can be verbose; only log the error class and message, never the URI. */
-function describeError(error: unknown): { name: string; message: string } {
-  return error instanceof Error
-    ? { name: error.name, message: error.message }
-    : { name: 'UnknownError', message: String(error) };
-}
-
+/**
+ * Driver errors are logged under `err`, which the logger reduces to name and code: their messages
+ * can contain the connection string.
+ */
 export function registerDatabaseEventLogging(logger: Logger): void {
   const { connection } = mongoose;
   connection.on('connected', () => logger.info('MongoDB connected'));
   connection.on('disconnected', () => logger.warn('MongoDB disconnected'));
   connection.on('reconnected', () => logger.info('MongoDB reconnected'));
   connection.on('error', (error: unknown) =>
-    logger.error({ err: describeError(error) }, 'MongoDB connection error'),
+    logger.error({ err: error }, 'MongoDB connection error'),
   );
 }
 
@@ -52,7 +49,7 @@ export async function connectWithRetry(uri: string, options: ConnectOptions): Pr
     } catch (error) {
       if (signal.aborted) break;
       logger.warn(
-        { attempt, retryInMs: retryDelayMs, err: describeError(error) },
+        { attempt, retryInMs: retryDelayMs, err: error },
         'MongoDB connection attempt failed',
       );
       try {

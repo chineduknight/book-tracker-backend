@@ -47,8 +47,9 @@ export const errorHandler: ErrorRequestHandler = (error: unknown, req, res, next
   } else if (isClientHttpError(error)) {
     appError = fromClientHttpError(error);
   } else {
-    // Unexpected: attach the original error to the request log line, but never to the response.
-    res.err = error instanceof Error ? error : new Error(String(error));
+    // Unexpected: pino-http adds it to the request log line through the safe error serializer
+    // (name and code only). Nothing about it reaches the response.
+    res.err = error instanceof Error ? error : new Error('Non-error value thrown');
     appError = new AppError(500, 'INTERNAL_ERROR', 'An unexpected error occurred');
   }
 

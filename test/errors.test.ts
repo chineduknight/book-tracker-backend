@@ -6,7 +6,13 @@ import { createLogger } from '../src/config/logger.js';
 import { errorHandler, notFoundHandler } from '../src/middleware/error-handler.js';
 import { requestLogger } from '../src/middleware/request-logger.js';
 import { AppError } from '../src/shared/errors.js';
-import { createLogCapture, createTestApp } from './helpers.js';
+import {
+  createCredentialError,
+  createLogCapture,
+  createTestApp,
+  CREDENTIAL_URI,
+  expectNoCredentials,
+} from './helpers.js';
 
 /** A minimal app wired with the production middleware, plus routes that throw on purpose. */
 function createThrowingApp(logStream?: Writable) {
@@ -14,7 +20,11 @@ function createThrowingApp(logStream?: Writable) {
   const app = express();
   app.use(requestLogger(logger));
   app.get('/boom', () => {
-    throw new Error('connection to mongodb://admin:hunter2@db failed');
+    throw createCredentialError();
+  });
+  app.get('/boom-string', () => {
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- simulating a careless throw
+    throw CREDENTIAL_URI;
   });
   app.get('/rejected', async () => {
     await Promise.resolve();
@@ -68,7 +78,7 @@ describe('error serialization', () => {
         requestId: expect.any(String),
       },
     });
-    expect(res.text).not.toContain('hunter2');
+    expectNoCredentials(res.text);
     expect(res.text).not.toContain('stack');
   });
 
@@ -79,13 +89,23 @@ describe('error serialization', () => {
     expect(res.body.error.code).toBe('INTERNAL_ERROR');
   });
 
-  it('logs unexpected errors server-side', async () => {
-    const logs = createLogCapture();
-    await request(createThrowingApp(logs.stream)).get('/boom');
+  it.each(['/boom', '/boom-string'])(
+    'logs %s at error level with the request id but without credentials',
+    async (path) => {
+      const logs = createLogCapture();
+      const res = await request(createThrowingApp(logs.stream)).get(path);
 
-    expect(logs.output()).toContain('"level":50');
-    expect(logs.output()).toContain('connection to mongodb://');
-  });
+      expectNoCredentials(res.text);
+      expectNoCredentials(logs.output());
+      const line = JSON.parse(logs.output().trim()) as Record<string, unknown>;
+      expect(line).toMatchObject({
+        level: 50,
+        req: { id: res.body.error.requestId, path },
+        res: { statusCode: 500 },
+        err: { name: 'Error' },
+      });
+    },
+  );
 
   it('rejects malformed JSON with 400 INVALID_JSON', async () => {
     const res = await request(createTestApp())

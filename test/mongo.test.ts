@@ -1,10 +1,18 @@
 import mongoose from 'mongoose';
 import { describe, expect, it, vi } from 'vitest';
 import { createLogger } from '../src/config/logger.js';
-import { connectWithRetry, isDatabaseConnected } from '../src/db/mongo.js';
-import { createLogCapture, mockDatabaseState } from './helpers.js';
-
-const URI = 'mongodb://user:pa55word@127.0.0.1:27017/book-tracker';
+import {
+  connectWithRetry,
+  isDatabaseConnected,
+  registerDatabaseEventLogging,
+} from '../src/db/mongo.js';
+import {
+  createCredentialError,
+  createLogCapture,
+  CREDENTIAL_URI as URI,
+  expectNoCredentials,
+  mockDatabaseState,
+} from './helpers.js';
 
 describe('isDatabaseConnected', () => {
   it('is true only in the connected state', () => {
@@ -20,7 +28,7 @@ describe('connectWithRetry', () => {
   it('retries failed attempts until the connection succeeds', async () => {
     const connect = vi
       .spyOn(mongoose, 'connect')
-      .mockRejectedValueOnce(new Error('ECONNREFUSED'))
+      .mockRejectedValueOnce(createCredentialError())
       .mockResolvedValueOnce(mongoose);
     const logs = createLogCapture();
 
@@ -33,7 +41,8 @@ describe('connectWithRetry', () => {
     expect(connected).toBe(true);
     expect(connect).toHaveBeenCalledTimes(2);
     expect(logs.output()).toContain('MongoDB connection attempt failed');
-    expect(logs.output()).not.toContain('pa55word');
+    expect(logs.output()).toContain('"err":{"name":"Error","code":"ECONNREFUSED"}');
+    expectNoCredentials(logs.output());
   });
 
   it('stops retrying once aborted', async () => {
@@ -63,5 +72,30 @@ describe('connectWithRetry', () => {
 
     expect(connected).toBe(false);
     expect(connect).not.toHaveBeenCalled();
+  });
+});
+
+describe('registerDatabaseEventLogging', () => {
+  it('logs connection errors without credentials', () => {
+    const { connection } = mongoose;
+    const events = ['connected', 'disconnected', 'reconnected', 'error'];
+    const before = new Map(events.map((event) => [event, new Set(connection.listeners(event))]));
+    const logs = createLogCapture();
+    registerDatabaseEventLogging(createLogger('info', logs.stream));
+
+    try {
+      connection.emit('error', createCredentialError());
+    } finally {
+      // Remove only the listeners this test added to the shared default connection.
+      for (const event of events) {
+        for (const listener of connection.listeners(event) as ((...args: unknown[]) => void)[]) {
+          if (!before.get(event)?.has(listener)) connection.off(event, listener);
+        }
+      }
+    }
+
+    expect(logs.output()).toContain('MongoDB connection error');
+    expect(logs.output()).toContain('"err":{"name":"Error","code":"ECONNREFUSED"}');
+    expectNoCredentials(logs.output());
   });
 });

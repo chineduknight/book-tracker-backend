@@ -2,12 +2,13 @@ import { once } from 'node:events';
 import { createServer, type Server } from 'node:http';
 import { createApp } from './app.js';
 import { ConfigError, loadEnv, type Env } from './config/env.js';
-import { createLogger } from './config/logger.js';
+import { createLogger, fatalErrorHandler } from './config/logger.js';
 import {
   connectWithRetry,
   disconnectFromDatabase,
   registerDatabaseEventLogging,
 } from './db/mongo.js';
+import { formatSafeError } from './shared/safe-error.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -37,14 +38,8 @@ async function main(): Promise<void> {
   }
 
   const logger = createLogger(env.LOG_LEVEL);
-  process.on('unhandledRejection', (reason) => {
-    logger.fatal({ err: reason }, 'Unhandled promise rejection');
-    process.exit(1);
-  });
-  process.on('uncaughtException', (error) => {
-    logger.fatal({ err: error }, 'Uncaught exception');
-    process.exit(1);
-  });
+  process.on('unhandledRejection', fatalErrorHandler(logger, 'Unhandled promise rejection'));
+  process.on('uncaughtException', fatalErrorHandler(logger, 'Uncaught exception'));
 
   const server = createServer(createApp({ logger, corsOrigins: env.CORS_ORIGIN }));
   server.listen(env.PORT);
@@ -87,7 +82,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`Fatal startup error: ${message}\n`);
+  // No logger may exist yet; print only the safe name/code (e.g. "Error (EADDRINUSE)").
+  process.stderr.write(`Fatal startup error: ${formatSafeError(error)}\n`);
   process.exit(1);
 });

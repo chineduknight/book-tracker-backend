@@ -39,7 +39,8 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 - On `SIGTERM`/`SIGINT` it stops retrying, closes the HTTP server (in-flight requests finish),
   waits for any pending connection attempt, then disconnects Mongoose. A 10 s timer forces exit
   if shutdown hangs.
-- Unhandled rejections and uncaught exceptions are logged as `fatal` and exit with code 1.
+- Unhandled rejections and uncaught exceptions are logged as `fatal` and exit with code 1. Like all
+  logged errors, they are reduced to name and code (see [decisions.md](decisions.md)).
 
 ## Future data model (design notes, not implemented)
 

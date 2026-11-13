@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { pinoHttp } from 'pino-http';
-import type { Logger } from '../config/logger.js';
+import { errorSerializer, type Logger } from '../config/logger.js';
 
 export const REQUEST_ID_HEADER = 'x-request-id';
 
@@ -39,6 +39,8 @@ export function requestLogger(logger: Logger) {
         path: req.url.split('?')[0],
       }),
       res: (res: { statusCode: number }) => ({ statusCode: res.statusCode }),
+      // pino-http would otherwise fall back to pino's std serializer (full message + stack).
+      err: errorSerializer,
     },
   });
 }
