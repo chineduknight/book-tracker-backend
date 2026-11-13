@@ -191,6 +191,87 @@ Error bodies:
 | `CONFLICT`              | `409`  | `An account with this email already exists`    | Reveals that the address is registered; revisit with email verification.                                                                                       |
 | `RATE_LIMITED`          | `429`  | `Too many requests, try again later`           | Sends `Retry-After`.                                                                                                                                           |
 
+### Books
+
+A `Book` is a reader's private catalogue entry, not a physical copy. Every endpoint requires `Authorization: Bearer <accessToken>` (the `requireAuthenticatedUser` middleware) and only ever reads or changes the caller's own non-deleted books; the owner comes from the access token, never from the request. DTOs: `src/modules/books/book.dto.ts`. Bruno: `bruno/Books/`.
+
+```ts
+interface BookDto {
+  id: string; // 24-character lowercase hex
+  title: string;
+  authors: string[]; // [] when none
+  format: 'physical' | 'ebook';
+  isbn?: string; // as entered (trimmed)
+  edition?: string;
+  description?: string;
+  coverUrl?: string; // stored only, never fetched by the API
+  pageCount?: number;
+  chapterCount?: number;
+  publicationYear?: number;
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC
+}
+
+interface DuplicateSuggestionDto {
+  book: BookDto;
+  matchedOn: Array<'title' | 'isbn'>; // always in this order
+}
+```
+
+Optional fields that are unset are **omitted** from responses (never `null`).
+
+| Method   | Path                            | Request                | Success                                                                                             | Errors                                         |
+| -------- | ------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `POST`   | `/api/v1/books`                 | Body: book fields      | `201` `{ "data": BookDto }`, `Location: /api/v1/books/{id}`                                         | `400 VALIDATION_ERROR`, `401`                  |
+| `GET`    | `/api/v1/books`                 | Query: list parameters | `200` `{ "data": BookDto[], "meta": { "pagination": { "page", "limit", "total", "totalPages" } } }` | `400 VALIDATION_ERROR`, `401`                  |
+| `GET`    | `/api/v1/books/duplicate-check` | Query: `title`, `isbn` | `200` `{ "data": { "matches": DuplicateSuggestionDto[] } }`                                         | `400 VALIDATION_ERROR`, `401`                  |
+| `GET`    | `/api/v1/books/:bookId`         | —                      | `200` `{ "data": BookDto }`                                                                         | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` |
+| `PATCH`  | `/api/v1/books/:bookId`         | Body: fields to change | `200` `{ "data": BookDto }`                                                                         | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` |
+| `DELETE` | `/api/v1/books/:bookId`         | —                      | `204`, empty body                                                                                   | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` |
+
+`401` is the standard `UNAUTHENTICATED` response with `WWW-Authenticate: Bearer`.
+
+**Book fields** (JSON body, strict: any other field, including `ownerId`, `userId`, `_id`, `id`, `deletedAt`, `normalizedTitle`, `normalizedIsbn`, `readingStatus`, `copyCount`, `createdAt`, is rejected as `Unknown field`):
+
+| Field             | Create   | Rules                                                                                   |
+| ----------------- | -------- | --------------------------------------------------------------------------------------- |
+| `title`           | required | string; trimmed, inner whitespace collapsed to one space; 1–250 characters              |
+| `format`          | required | `physical` or `ebook`                                                                   |
+| `authors`         | optional | array of up to 20 strings, each trimmed and 1–120 characters; defaults to `[]`          |
+| `isbn`            | optional | string, trimmed, at most 32 characters, at least one letter or digit; stored as entered |
+| `edition`         | optional | string, trimmed, 1–100 characters                                                       |
+| `description`     | optional | string, trimmed, 1–5,000 characters (line breaks kept)                                  |
+| `coverUrl`        | optional | absolute `http` or `https` URL, at most 2,048 characters                                |
+| `pageCount`       | optional | JSON integer 1–100,000                                                                  |
+| `chapterCount`    | optional | JSON integer 1–10,000                                                                   |
+| `publicationYear` | optional | JSON integer 1–9999                                                                     |
+
+Empty optional strings (blank after trimming) are rejected rather than stored; omit the field instead. On create, `null` is not accepted for any field.
+
+**PATCH semantics:** an omitted field is unchanged; `null` clears `isbn`, `edition`, `description`, `coverUrl`, `pageCount`, `chapterCount` or `publicationYear`; `"authors": []` clears authors; `title`, `format` and `authors` cannot be `null`. An empty body is rejected with detail `{ "field": "body", "message": "must change at least one field" }`.
+
+**List parameters** (query string; each at most once, a repeated parameter fails with `must be given only once`; unknown parameters are rejected):
+
+| Parameter | Default  | Rules                                                                                                          |
+| --------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `page`    | `1`      | positive whole number without leading zeros                                                                    |
+| `limit`   | `20`     | 1–100                                                                                                          |
+| `q`       | —        | trimmed, at most 120 characters, at least one letter or digit                                                  |
+| `format`  | —        | `physical` or `ebook`                                                                                          |
+| `sort`    | `recent` | `recent` (newest first), `oldest`, `title_asc`, `title_desc`; ties always broken by `id` in the same direction |
+
+- **Search (`q`)** uses MongoDB text search over `title` and `authors` without language rules: a book matches if its title or authors contain **any** of the words, as whole words, case- and diacritic-insensitively. There is no stemming, prefix, fuzzy or relevance ordering; results follow `sort`. Quotes and hyphens are treated as spaces, so MongoDB phrase and negation syntax is not available (`Jean-Paul` searches `Jean` and `Paul`).
+- **Title sort** compares titles ignoring case, in Unicode code-point order (not locale collation).
+- `format` and `q` apply to both `data` and `pagination.total`. A page past the end returns `data: []` with the same metadata. `totalPages` is `0` when there are no books.
+
+**Duplicate check:** query `title` and/or `isbn` (at least one; each non-blank and valid as on create). Returns up to 10 of the caller's non-deleted books whose title matches ignoring case and extra whitespace (punctuation is significant) and/or whose ISBN matches ignoring case, spaces and hyphens, newest first with `id` as the tie-breaker. Suggestions are informational: creating a duplicate title or ISBN is always allowed. A missing query fails with detail `{ "field": "query", "message": "provide a title, an isbn or both" }`.
+
+**Identifiers and not-found:** a `bookId` that is not 24 hexadecimal characters fails with `400 VALIDATION_ERROR` and detail `{ "field": "bookId", "message": "must be a 24-character hexadecimal id" }`. A well-formed id that does not exist, was deleted or belongs to another reader returns the identical `404 { "error": { "code": "NOT_FOUND", "message": "Book not found", "requestId": "<id>" } }`.
+
+**Deletion is soft:** `DELETE` marks the book deleted and returns `204`. The book then behaves as missing everywhere (get, update, list, search, duplicate check, repeated delete gives `404`). Its record is kept so that later reading history, notes, copies and loans are never destroyed; there is no restore or purge endpoint yet.
+
+**Reading status** is not part of a book. Books without reading sessions will be treated as unread by the future reading module.
+
 ### Responses on any path
 
 The JSON body parser runs before routing, so body errors are reported even for paths that do not exist.

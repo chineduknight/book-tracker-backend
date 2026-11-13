@@ -91,3 +91,27 @@ Details and exact responses are in the [API contract](api-contract.md#authentica
   keeps its own counters, so effective limits multiply; move to a shared store before scaling
   out. Behind a reverse proxy, configure Express `trust proxy` or every client shares one
   address bucket.
+
+## Book catalogue decisions
+
+- **A book is a catalogue entry, not a copy.** Physical copies, condition, location and loans
+  belong to later modules. Books store no reading status; a book with no reading sessions is
+  unread, and acquisition dates are never used to infer past reading.
+- **Soft deletion preserves history.** Deleting a book sets `deletedAt` and hides it from every
+  book endpoint; the record stays so that future reading sessions, notes, copies and loans that
+  reference it are never destroyed or orphaned by a catalogue delete (invariant 7). Future modules
+  must not cascade-delete history when a book is deleted. Restore and permanent purge are not
+  implemented; purging will need its own explicit, user-initiated design.
+- **Duplicates are allowed and only suggested.** No unique index on title or ISBN; the
+  duplicate check matches normalized title (case and whitespace, punctuation kept) and ISBN
+  (case, spaces, hyphens) and never blocks creation.
+- **ISBNs are stored as entered** (trimmed). They are not validated as ISBN-10/13 checksums,
+  because readers catalogue older and regional editions with non-standard identifiers.
+- **Search is MongoDB text search without language rules** (`default_language: 'none'`): whole
+  words, any word matches, no stemming or stop words, so short titles such as "It" are findable
+  and non-English titles are not mangled. No external search service.
+- **Owner scoping is enforced in every query and by the indexes.** All book indexes lead with
+  `ownerId, deletedAt`; the text index is compound with that prefix, so MongoDB refuses a text
+  search that is not scoped to one owner.
+- **Title sort uses a lowercased normalized title** in code-point order. Locale-aware collation
+  can be added later with a collated index if readers need it.

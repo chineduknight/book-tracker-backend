@@ -101,15 +101,21 @@ All routes are under `/api/v1`. Success bodies are `{ "data": ... }`; errors are
 The [API contract](docs/api-contract.md) lists every status and body, including `HEAD`, CORS
 preflight and request-body errors.
 
-| Method | Path                    | Purpose                                                 |
-| ------ | ----------------------- | ------------------------------------------------------- |
-| GET    | `/api/v1/health`        | Liveness. Always 200 while the process serves HTTP      |
-| GET    | `/api/v1/ready`         | Readiness. 200 when MongoDB is connected, otherwise 503 |
-| POST   | `/api/v1/auth/register` | Create an account and start a session (201)             |
-| POST   | `/api/v1/auth/login`    | Start a session with email and password                 |
-| POST   | `/api/v1/auth/refresh`  | Exchange a refresh token for a new token pair           |
-| POST   | `/api/v1/auth/logout`   | Revoke the session that owns a refresh token (204)      |
-| GET    | `/api/v1/auth/me`       | The authenticated user (bearer access token)            |
+| Method | Path                            | Purpose                                                      |
+| ------ | ------------------------------- | ------------------------------------------------------------ |
+| GET    | `/api/v1/health`                | Liveness. Always 200 while the process serves HTTP           |
+| GET    | `/api/v1/ready`                 | Readiness. 200 when MongoDB is connected, otherwise 503      |
+| POST   | `/api/v1/auth/register`         | Create an account and start a session (201)                  |
+| POST   | `/api/v1/auth/login`            | Start a session with email and password                      |
+| POST   | `/api/v1/auth/refresh`          | Exchange a refresh token for a new token pair                |
+| POST   | `/api/v1/auth/logout`           | Revoke the session that owns a refresh token (204)           |
+| GET    | `/api/v1/auth/me`               | The authenticated user (bearer access token)                 |
+| POST   | `/api/v1/books`                 | Add a book to the reader's catalogue (201 + `Location`)      |
+| GET    | `/api/v1/books`                 | List, search, filter and sort the reader's books (paginated) |
+| GET    | `/api/v1/books/duplicate-check` | Suggest existing books with the same title or ISBN           |
+| GET    | `/api/v1/books/:bookId`         | One of the reader's books                                    |
+| PATCH  | `/api/v1/books/:bookId`         | Change fields; `null` clears an optional field               |
+| DELETE | `/api/v1/books/:bookId`         | Soft-delete a book (204)                                     |
 
 Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
 token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
@@ -130,6 +136,7 @@ src/
 ├── db/                    # mongo.ts (connect with retry, readiness, disconnect)
 ├── middleware/            # request id + logging, 404 and centralised error handling
 ├── modules/auth/          # register, login, sessions, tokens, rate limits, auth middleware
+├── modules/books/         # book catalogue: model, schemas, DTOs, service, routes
 ├── modules/health/        # liveness and readiness routes + response DTOs
 ├── modules/users/         # user model, public UserDto, user service
 └── shared/                # AppError, response envelopes, request validation, safe errors
@@ -161,18 +168,17 @@ runs the Bruno collection against it.
 
 Included: scaffold, config validation, MongoDB lifecycle, health/readiness, security baseline
 (helmet, CORS allowlist, 100 kB JSON limit), structured logging with redaction, error handling,
-authentication and user accounts (register, login, refresh, logout, current user), tests, CI,
-Bruno.
+authentication and user accounts (register, login, refresh, logout, current user), the private
+book catalogue (create, list, search, filter, sort, update, soft delete, duplicate suggestions),
+tests, CI, Bruno.
 
-Not included yet: email verification, password reset, OAuth, any book/copy/reading/note/loan
-endpoints, UI, deployment.
+Not included yet: email verification, password reset, OAuth, copy/reading/note/loan endpoints,
+book restore, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Books (titles)**: owner-scoped catalogue CRUD, formats including ebook catalogue entries,
-   external cover URLs.
-2. **Copies**: physical copies per title with locations.
-3. **Reading sessions**: reads and rereads with optional completion date, rating and summary.
-4. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
-5. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
-6. **Export**: full per-user data export.
+1. **Copies**: physical copies per title with locations.
+2. **Reading sessions**: reads and rereads with optional completion date, rating and summary.
+3. **Notes**: general and chapter notes with owner-scoped MongoDB text search.
+4. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
+5. **Export**: full per-user data export.
