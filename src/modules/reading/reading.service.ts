@@ -250,6 +250,15 @@ export async function findReadingOverview(
   };
 }
 
+/** Id of the book a visible reading session belongs to, for modules that link to sessions. */
+export async function requireBookIdOfVisibleReadingSession(
+  ownerId: string,
+  sessionId: string,
+): Promise<string> {
+  const { session } = await findVisibleSession(ownerId, sessionId);
+  return session.bookId.toHexString();
+}
+
 export async function findReadingSessionOwnedByUser(
   ownerId: string,
   sessionId: string,

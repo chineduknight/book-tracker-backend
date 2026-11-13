@@ -1,0 +1,32 @@
+meta {
+  name: List all notes
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/notes
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+tests {
+  test("lists notes from every one of the reader's books, newest first", function () {
+    expect(res.getStatus()).to.equal(200);
+    const notes = res.getBody().data;
+    expect(notes).to.have.lengthOf(3);
+    expect(notes[2].id).to.equal(bru.getVar("notesNoteId"));
+    expect(res.getBody().meta.pagination.total).to.equal(3);
+  });
+}
+
+docs {
+  # GET /api/v1/notes
+
+  Accepts the same query as the book list plus `bookId`. Notes of deleted books are excluded
+  before counting, so totals and pages are exact.
+}

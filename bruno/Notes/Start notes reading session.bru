@@ -1,0 +1,29 @@
+meta {
+  name: Start notes reading session
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/books/{{notesBookId}}/reading-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {}
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("notesSessionId", res.getBody().data.id);
+}
+
+tests {
+  test("starts the reading the highlight links to", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

@@ -1,0 +1,36 @@
+meta {
+  name: List book notes
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/books/{{notesBookId}}/notes?sort=oldest
+  body: none
+  auth: bearer
+}
+
+params:query {
+  sort: oldest
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+tests {
+  test("lists the book's notes oldest first", function () {
+    expect(res.getStatus()).to.equal(200);
+    const ids = res.getBody().data.map((note) => note.id);
+    expect(ids).to.eql([bru.getVar("notesNoteId"), bru.getVar("notesHighlightId")]);
+    expect(res.getBody().meta.pagination).to.eql({ page: 1, limit: 20, total: 2, totalPages: 1 });
+  });
+}
+
+docs {
+  # GET /api/v1/books/:bookId/notes
+
+  Query (each at most once; others rejected): `page`, `limit` (1–100), `sort` (`recent` default |
+  `oldest`, by creation time with id as tie-breaker), `kind`, `q` (word search), `chapter` (exact
+  label ignoring case and spacing) and `readingSessionId` (a session of this book).
+}

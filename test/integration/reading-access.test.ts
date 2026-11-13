@@ -81,7 +81,7 @@ describe('reading logging', () => {
       '1987-03-14',
       '1987-04-15',
       '1980-01-01',
-      '4321',
+      '"progress"',
       'Private reflection',
       '"rating"',
       'status=completed',

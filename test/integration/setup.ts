@@ -5,6 +5,7 @@ import { SessionModel } from '../../src/modules/auth/session.model.js';
 import { BookModel } from '../../src/modules/books/book.model.js';
 import { PhysicalCopyModel } from '../../src/modules/copies/copy.model.js';
 import { LocationModel } from '../../src/modules/locations/location.model.js';
+import { NoteModel } from '../../src/modules/notes/note.model.js';
 import { ReadingSessionModel } from '../../src/modules/reading/reading.model.js';
 import { UserModel } from '../../src/modules/users/user.model.js';
 
@@ -30,6 +31,7 @@ async function deleteAuthData(): Promise<void> {
     LocationModel.deleteMany({}),
     PhysicalCopyModel.deleteMany({}),
     ReadingSessionModel.deleteMany({}),
+    NoteModel.deleteMany({}),
   ]);
 }
 
@@ -46,6 +48,7 @@ beforeAll(async () => {
     LocationModel.syncIndexes(),
     PhysicalCopyModel.syncIndexes(),
     ReadingSessionModel.syncIndexes(),
+    NoteModel.syncIndexes(),
   ]);
 });
 

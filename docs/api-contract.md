@@ -7,7 +7,7 @@ This document defines shared HTTP behavior. Every implemented endpoint must addi
 - Base path: `/api/v1`.
 - JSON responses use `Content-Type: application/json`; `204 No Content` has no body.
 - All responses include an `X-Request-Id` header. Error responses also include `requestId` in the body if one was assigned.
-- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations` and `/api/v1/reading-sessions` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
+- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions` and `/api/v1/notes` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
 - CORS exposes `X-Request-Id` and `Location` to allowed browser origins.
 - **Logging:** request logs contain the method, the URL path (which includes resource ids such as `/api/v1/books/{id}`), the status and the request id. Query strings, headers and bodies are never logged, so titles, search terms, location names, notes, emails, passwords and tokens never reach the logs.
 - Public IDs are strings named `id`, not MongoDB `_id`; never return `__v` or internal model fields.
@@ -79,18 +79,18 @@ Every error uses the established envelope:
 
 `details` is optional, contains only safe field-level feedback, and must not expose credentials, database messages, or input secrets. Known error bodies use a safe, stable `code` and human-readable `message`.
 
-| Status                       | Intended use                                                                    | Example code                                                                                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                                                                                                          |
-| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN`                                                                                           |
-| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                                                                                                                 |
-| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                                                                                                                 |
-| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`, `READING_SESSION_IN_PROGRESS`, `INVALID_READING_TRANSITION`, `READING_SESSION_UPDATE_CONFLICT` |
-| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                                                                                                                         |
-| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                                                                                                                    |
-| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                                                                                                              |
-| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                                                                                                            |
-| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                                                                                                                       |
+| Status                       | Intended use                                                                    | Example code                                                                                                                                                                                 |
+| ---------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                                                                                                                                           |
+| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN`                                                                                                                            |
+| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                                                                                                                                                  |
+| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                                                                                                                                                  |
+| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`, `READING_SESSION_IN_PROGRESS`, `INVALID_READING_TRANSITION`, `READING_SESSION_UPDATE_CONFLICT`, `READING_SESSION_BOOK_MISMATCH` |
+| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                                                                                                                                                          |
+| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                                                                                                                                                     |
+| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                                                                                                                                               |
+| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                                                                                                                                             |
+| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                                                                                                                                                        |
 
 Do not change existing implemented error codes merely to match these suggested names; preserve current behavior or propose an explicit breaking-change decision. Avoid `200` responses that represent errors inside `data`.
 
@@ -413,6 +413,73 @@ There is no endpoint to delete a reading session.
 **History query** (both list endpoints; each parameter at most once, unknown parameters rejected): `page` ≥ 1 (default 1), `limit` 1–100 (default 20), optional `status` (`in_progress` | `completed`), `sort` `recent` (default) or `oldest` by creation time with `id` as tie-breaker. Empty history returns `data: []` with `totalPages: 0`.
 
 **Visibility:** a session is visible only while it belongs to the reader **and** its book is one of the reader's active books. A missing session, another reader's session and a session of a deleted book all return the same `404 "Reading session not found"`; book-scoped endpoints return `404 "Book not found"` for a missing, deleted or foreign book. `GET /reading-sessions` excludes sessions of deleted books **before** counting and paging, so totals and pages are exact. Deleting a book keeps all its sessions stored.
+
+### Notes and highlights
+
+A note is a **private, book-level record** about one of the reader's books (physical or ebook). `kind` is fixed at creation: a `note` is the reader's own writing and a `highlight` is a quotation from the book, optionally with the reader's `commentary`. A note may be linked to one reading session of the same book (for example thoughts from a reread). Every endpoint requires a bearer access token. DTOs: `src/modules/notes/note.dto.ts`. Bruno: `bruno/Notes/`.
+
+```ts
+type NoteKind = 'note' | 'highlight';
+
+interface NoteDto {
+  id: string; // 24-character lowercase hex
+  bookId: string;
+  readingSessionId: string | null; // always present; null for a book-level note
+  kind: NoteKind;
+  content: string; // note: Markdown source; highlight: plain-text quotation
+  title?: string; // omitted when unset
+  commentary?: string; // Markdown source, omitted when unset
+  chapter?: string; // free-text label as entered, omitted when unset
+  pageNumber?: number; // omitted when unset
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC
+}
+```
+
+| Method   | Path                          | Request                        | Success                                                     | Errors                                                                                                                              |
+| -------- | ----------------------------- | ------------------------------ | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `POST`   | `/api/v1/books/:bookId/notes` | Note fields                    | `201` `{ "data": NoteDto }`, `Location: /api/v1/notes/{id}` | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found" or "Reading session not found", `409 READING_SESSION_BOOK_MISMATCH` |
+| `GET`    | `/api/v1/books/:bookId/notes` | Notes query                    | `200` `{ "data": NoteDto[], "meta": { "pagination" } }`     | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found" or "Reading session not found", `409 READING_SESSION_BOOK_MISMATCH` |
+| `GET`    | `/api/v1/notes`               | Notes query + `bookId`         | `200` `{ "data": NoteDto[], "meta": { "pagination" } }`     | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found" or "Reading session not found", `409 READING_SESSION_BOOK_MISMATCH` |
+| `GET`    | `/api/v1/notes/:noteId`       | —                              | `200` `{ "data": NoteDto }`                                 | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Note not found"                                                                     |
+| `PATCH`  | `/api/v1/notes/:noteId`       | Fields to change, at least one | `200` `{ "data": NoteDto }`                                 | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Note not found"                                                                     |
+| `DELETE` | `/api/v1/notes/:noteId`       | —                              | `204`, empty body                                           | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Note not found"                                                                     |
+
+**Fields (strict; `ownerId`, `userId`, `bookId`, `id`, `chapterKey`, `deletedAt`, `createdAt` and any other field are rejected as `Unknown field`). Lengths count characters after trimming:**
+
+| Field              | Rules                                                                                                         |
+| ------------------ | ------------------------------------------------------------------------------------------------------------- |
+| `kind`             | `note` or `highlight`; required on create, can never be changed                                               |
+| `content`          | required; trimmed, 1–20,000 characters for a note, 1–5,000 for a highlight; cannot be cleared                 |
+| `title`            | trimmed, 1–160 characters                                                                                     |
+| `commentary`       | trimmed, 1–5,000 characters; the reader's reflection, usually on a highlight but allowed on either kind       |
+| `chapter`          | trimmed, 1–200 characters; a free-text label such as `Chapter 3` or `Introduction`, not a pointer into a file |
+| `pageNumber`       | integer 1–100,000; a reference only, never compared with the book's `pageCount` or treated as progress        |
+| `readingSessionId` | create only: a 24-character hex id of a visible reading session **of the same book**, or `null` (default)     |
+
+- **Text is stored verbatim.** Only surrounding whitespace is trimmed; inner whitespace, line breaks, punctuation and quotation marks are kept exactly. `content` of a note and `commentary` are **Markdown source**; a highlight's `content` is plain text. The API never renders, sanitizes or interprets this text and never returns HTML. A client must render Markdown with safe escaping and must not trust raw HTML embedded in it.
+- **Size:** the 100 kB JSON body limit applies to every request. Ordinary text fits comfortably, but a maximal note made mostly of multi-byte or `\u`-escaped characters can exceed it and is rejected with `413 PAYLOAD_TOO_LARGE`.
+- **Create:** `kind` and `content` are required; `readingSessionId` omitted or `null` makes a book-level note. The book is checked first, then the session: a malformed id gives `400` naming the field; a missing, deleted or foreign book gives `404 "Book not found"`; a missing session, another reader's session or a session of a deleted book gives `404 "Reading session not found"`; the reader's own visible session of **another** book gives `409 { "error": { "code": "READING_SESSION_BOOK_MISMATCH", "message": "The reading session belongs to a different book", "requestId": "<id>" } }`. Any failure stores nothing. In-progress and completed sessions can both be linked.
+- **PATCH:** may change `content`, `title`, `commentary`, `chapter` and `pageNumber`. Omitted fields are unchanged; `null` clears `title`, `commentary`, `chapter` or `pageNumber`. `kind`, `readingSessionId` and the book can never change, so a note's attribution to a reading is permanent. A highlight's new `content` is still limited to 5,000 characters (detail `{ "field": "content", "message": "must be at most 5000 characters for a highlight" }`). Each PATCH writes only the fields it names, so concurrent edits of different fields both persist; for the same field the last write wins.
+- **DELETE** is an explicit user action and soft: it returns `204` with no body, after which the note behaves as missing everywhere (get, PATCH, delete, lists, search, totals). The record is kept for future export or restore policies; there is no restore endpoint.
+- **Visibility:** a note is visible only while it belongs to the reader, is not deleted, **and** its book is one of the reader's active books. A missing note, another reader's note, a deleted note and a note of a deleted book all return the same `404 "Note not found"`. Deleting a book or completing a session never deletes or changes notes; a deleted book's notes are hidden and stay stored.
+
+**Notes query** (both list endpoints; each parameter at most once; unknown parameters rejected):
+
+| Parameter          | Rules                                                                                                                                                                                              |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page`, `limit`    | `page` ≥ 1 (default 1), `limit` 1–100 (default 20)                                                                                                                                                 |
+| `sort`             | `recent` (default) or `oldest`, by creation time with `id` as tie-breaker in the same direction; never by relevance                                                                                |
+| `kind`             | `note` or `highlight`                                                                                                                                                                              |
+| `q`                | trimmed, 1–120 characters with at least one letter or digit; word search (see below)                                                                                                               |
+| `chapter`          | trimmed, 1–200 characters; exact label match ignoring case, spacing and Unicode composition (`CAFÉ  society` matches `Café Society`, whether `é` is one code point or `e` plus a combining accent) |
+| `readingSessionId` | a visible session of the reader; on the book list (or with `bookId`) it must belong to that book, otherwise `409 READING_SESSION_BOOK_MISMATCH`                                                    |
+| `bookId`           | `GET /notes` only: one of the reader's active books                                                                                                                                                |
+
+- A requested book or session that is missing, deleted or foreign returns `404` ("Book not found" / "Reading session not found"), never an empty page.
+- **Search** (`q`) uses the owner-scoped MongoDB text index over `title`, `content`, `commentary` and `chapter`. It matches whole words (no prefixes, fuzziness or stemming), ignores case and diacritics, and returns notes containing **any** of the words. Quotes and hyphens are treated as plain text, not phrase or negation operators, and the query is never used as a regular expression.
+- `GET /notes` excludes notes of deleted books **before** counting and paging, so totals and pages are exact. Empty results return `data: []` with `total: 0` and `totalPages: 0`.
+- Request logs record only method, path (with ids), status and request id; note text, search terms and other query parameters are never logged, and validation errors never echo submitted text.
 
 ### Responses on any path
 

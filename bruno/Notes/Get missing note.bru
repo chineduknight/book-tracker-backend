@@ -1,0 +1,30 @@
+meta {
+  name: Get missing note
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/notes/64b7f0c2a1b2c3d4e5f60718
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error).to.eql({
+      code: "NOT_FOUND",
+      message: "Note not found",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}
+
+docs {
+  Another reader's note, a deleted note and a note of a deleted book return exactly this response.
+}

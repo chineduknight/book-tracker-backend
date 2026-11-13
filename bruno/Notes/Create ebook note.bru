@@ -1,0 +1,30 @@
+meta {
+  name: Create ebook note
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/books/{{notesEbookId}}/notes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {
+    "kind": "note",
+    "content": "Strider is more than he seems."
+  }
+}
+
+tests {
+  test("adds a minimal book-level note to an ebook", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.bookId).to.equal(bru.getVar("notesEbookId"));
+    expect(res.getBody().data.readingSessionId).to.equal(null);
+  });
+}

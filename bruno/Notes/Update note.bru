@@ -1,0 +1,40 @@
+meta {
+  name: Update note
+  type: http
+  seq: 16
+}
+
+patch {
+  url: {{baseUrl}}/notes/{{notesNoteId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {
+    "title": "The riddle game, revisited",
+    "pageNumber": 73
+  }
+}
+
+tests {
+  test("changes only the given fields", function () {
+    expect(res.getStatus()).to.equal(200);
+    const note = res.getBody().data;
+    expect(note.title).to.equal("The riddle game, revisited");
+    expect(note.pageNumber).to.equal(73);
+    expect(note.chapter).to.equal("Riddles in the Dark");
+  });
+}
+
+docs {
+  # PATCH /api/v1/notes/:noteId
+
+  Changes `content`, `title`, `commentary`, `chapter` or `pageNumber`; at least one is required.
+  `kind`, `readingSessionId` and the book cannot be changed. A highlight's content stays limited
+  to 5,000 characters.
+}

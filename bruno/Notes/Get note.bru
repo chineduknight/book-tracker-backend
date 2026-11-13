@@ -1,0 +1,23 @@
+meta {
+  name: Get note
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/notes/{{notesNoteId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+tests {
+  test("returns the note", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.id).to.equal(bru.getVar("notesNoteId"));
+    expect(res.getBody().data.kind).to.equal("note");
+  });
+}

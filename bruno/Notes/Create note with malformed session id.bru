@@ -1,0 +1,32 @@
+meta {
+  name: Create note with malformed session id
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/books/{{notesBookId}}/notes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {
+    "kind": "note",
+    "content": "Linked",
+    "readingSessionId": "not-an-id"
+  }
+}
+
+tests {
+  test("returns 400 naming readingSessionId", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([
+      { field: "readingSessionId", message: "must be a 24-character hexadecimal id" },
+    ]);
+  });
+}

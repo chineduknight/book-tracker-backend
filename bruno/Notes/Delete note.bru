@@ -1,0 +1,29 @@
+meta {
+  name: Delete note
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{baseUrl}}/notes/{{notesNoteId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+tests {
+  test("returns 204 with an empty body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # DELETE /api/v1/notes/:noteId
+
+  Soft-deletes the note: it is kept in storage but behaves as missing everywhere afterwards. A
+  repeated delete returns 404. Deleting a book hides its notes without deleting them.
+}

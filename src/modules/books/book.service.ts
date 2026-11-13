@@ -3,11 +3,8 @@ import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response
 import { AppError } from '../../shared/errors.js';
 import { toPublicBook, type BookDto, type DuplicateSuggestionDto } from './book.dto.js';
 import { BookModel } from './book.model.js';
-import {
-  normalizeIsbnForMatching,
-  normalizeTitleForMatching,
-  toTextSearchWords,
-} from './book.normalization.js';
+import { toTextSearchWords } from '../../shared/text.js';
+import { normalizeIsbnForMatching, normalizeTitleForMatching } from './book.normalization.js';
 import type {
   BookChanges,
   BookListQuery,

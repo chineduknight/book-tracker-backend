@@ -109,6 +109,35 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 - PATCH uses compare-and-set on the internal `revision` field; see
   [decisions.md](decisions.md#reading-decisions).
 
+## Notes and highlights
+
+- `modules/notes` owns the `notes` collection and serves `/books/:bookId/notes` and `/notes` from
+  one router, mounted before the books router.
+- It never reads the books or readingsessions collections itself: it calls
+  `requireActiveBookOwnedByUser`, `isActiveBookOwnedByUser` and `keepDocumentsOfActiveBooks` from
+  the books service, and `requireBookIdOfVisibleReadingSession` from the reading service (the
+  session's book id if the session belongs to the reader and its book is active, otherwise
+  `404 "Reading session not found"`). The notes service compares that book id with the note's
+  book to reject links across books.
+- A note is visible only when `{ _id, ownerId, deletedAt: null }` matches **and** its book is one
+  of the reader's active books. Single-note writes repeat the owner and not-deleted filter in one
+  atomic `findOneAndUpdate`/`updateOne`, so a concurrent delete is never undone.
+- `chapterKey` is an internal, derived copy of `chapter` (whitespace collapsed, NFC, lowercased)
+  written in the same update as `chapter`, so the chapter filter can use plain equality.
+- Indexes, all led by `ownerId`:
+  - `owner_book_active_recent` `{ ownerId, bookId, deletedAt, createdAt: -1, _id: -1 }`: one
+    book's notes, including its chapter filter.
+  - `owner_active_recent` `{ ownerId, deletedAt, createdAt: -1, _id: -1 }`: the global list.
+  - `owner_session_active_recent` `{ ownerId, readingSessionId, deletedAt, createdAt: -1, _id: -1 }`:
+    notes of one reading session.
+  - `owner_active_text` `{ ownerId: 1, deletedAt: 1 }` followed by text on `title`, `content`,
+    `commentary` and `chapter`, `default_language: 'none'`. MongoDB refuses a `$text` query on a
+    compound text index unless every prefix field has an equality condition, so a search cannot
+    run without the owner and not-deleted filters.
+
+  None is unique: identical notes are allowed. The integration tests assert each query shape's
+  index with `explain`, and that unscoped text searches are refused.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
@@ -121,18 +150,17 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 
 ## Future data model (design notes, not implemented)
 
-`User`, `Session`, `RefreshToken`, `Book`, `StorageLocation`, `PhysicalCopy` and
-`ReadingSession` exist (see above); the remaining models are design notes.
+`User`, `Session`, `RefreshToken`, `Book`, `StorageLocation`, `PhysicalCopy`, `ReadingSession`
+and `Note` exist (see above); `Loan` is still a design note.
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)
           │
           ├─* ReadingSession              (one per read; rereads add sessions)
-          └─* Note                        (general or chapter-scoped; optional session link)
+          └─* Note                        (note or highlight; optional link to one session)
 ```
 
 - Every collection carries `ownerId`, and indexes lead with it (for example
   `{ ownerId: 1, bookId: 1 }`).
 - `Loan`: partial unique index on `{ copyId: 1 }` where `returnedAt` is null.
-- `Note`: text index for owner-scoped search, always filtered by `ownerId`.
 - `Book.format` distinguishes physical books from ebook catalogue entries; there is no file reference.

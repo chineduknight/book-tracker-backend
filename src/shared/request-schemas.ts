@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { containsLetterOrDigit } from './text.js';
 
 const OBJECT_ID_HEX = /^[0-9a-fA-F]{24}$/;
 const POSITIVE_WHOLE_NUMBER = /^[1-9][0-9]*$/;
@@ -34,6 +35,10 @@ export const limitQueryParameter = positiveWholeNumber
   .pipe(z.number().max(MAX_PAGE_LIMIT))
   .default(DEFAULT_PAGE_LIMIT);
 export const objectIdQueryParameter = singleQueryValue.pipe(objectIdSchema);
+export const textSearchQueryParameter = singleQueryValue
+  .trim()
+  .max(120)
+  .refine(containsLetterOrDigit, 'must contain at least one letter or digit');
 
 export function requiringAtLeastOneChange<Changes extends z.ZodObject>(changes: Changes) {
   return changes.refine((value) => Object.keys(value).length > 0, {

@@ -1,0 +1,32 @@
+meta {
+  name: Clear note fields
+  type: http
+  seq: 17
+}
+
+patch {
+  url: {{baseUrl}}/notes/{{notesNoteId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {
+    "title": null,
+    "chapter": null,
+    "pageNumber": null
+  }
+}
+
+tests {
+  test("null clears optional fields, which are then omitted", function () {
+    expect(res.getStatus()).to.equal(200);
+    const note = res.getBody().data;
+    expect(note).to.not.have.any.keys("title", "chapter", "pageNumber");
+    expect(note.content).to.contain("## Riddles");
+  });
+}

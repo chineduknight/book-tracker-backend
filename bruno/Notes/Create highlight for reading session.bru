@@ -1,0 +1,45 @@
+meta {
+  name: Create highlight for reading session
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/books/{{notesBookId}}/notes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {
+    "kind": "highlight",
+    "content": "“What has it got in its pocketses?”",
+    "commentary": "The riddle that is *not* a riddle.",
+    "chapter": "Riddles in the Dark",
+    "readingSessionId": "{{notesSessionId}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("notesHighlightId", res.getBody().data.id);
+}
+
+tests {
+  test("links the highlight to the reading session and keeps the quotation exactly", function () {
+    expect(res.getStatus()).to.equal(201);
+    const highlight = res.getBody().data;
+    expect(highlight.kind).to.equal("highlight");
+    expect(highlight.readingSessionId).to.equal(bru.getVar("notesSessionId"));
+    expect(highlight.content).to.equal("“What has it got in its pocketses?”");
+    expect(highlight).to.not.have.property("title");
+  });
+}
+
+docs {
+  A highlight quotes the book as plain text; `commentary` holds the reader's own thoughts. The
+  session link records which reading (for example a reread) it belongs to and can never be changed.
+}

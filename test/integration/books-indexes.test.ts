@@ -1,27 +1,10 @@
 import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import { BookModel } from '../../src/modules/books/book.model.js';
+import { indexesUsedBy } from './query-plans.js';
 
 const ownerId = new mongoose.Types.ObjectId();
 const activeBooks = { ownerId, deletedAt: null };
-
-function indexNamesIn(plan: unknown, names = new Set<string>()): Set<string> {
-  if (Array.isArray(plan)) plan.forEach((stage) => indexNamesIn(stage, names));
-  else if (typeof plan === 'object' && plan !== null) {
-    for (const [key, value] of Object.entries(plan)) {
-      if (key === 'indexName' && typeof value === 'string') names.add(value);
-      else indexNamesIn(value, names);
-    }
-  }
-  return names;
-}
-
-async function indexesUsedBy(query: ReturnType<typeof BookModel.find>): Promise<string[]> {
-  const explanation = (await query.explain('queryPlanner')) as unknown as {
-    queryPlanner: { winningPlan: unknown };
-  };
-  return [...indexNamesIn(explanation.queryPlanner.winningPlan)];
-}
 
 describe('book indexes', () => {
   it('declares only the planned indexes, none of them unique on title or ISBN', async () => {

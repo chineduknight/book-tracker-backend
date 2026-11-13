@@ -204,3 +204,56 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
   `directConnection=true` is enforced), refuses a busy port before resetting anything, waits for
   the API process it started to report listening before trusting `/ready`, and prints only safe
   error names and codes.
+  A local address is not proof that the database is disposable: an SSH tunnel or port forward on
+  `localhost` can reach a remote server. Run the smoke command only against a MongoDB you know is
+  a throwaway local instance (as in CI); the runner cannot detect a tunnel.
+
+## Notes decisions
+
+- **One `Note` model with an immutable `kind`.** `note` (the reader's own writing) and
+  `highlight` (a quotation) share fields, storage, search and endpoints; the distinction is the
+  explicit `kind`, never a guess from the text. A highlight is limited to 5,000 characters and a
+  note to 20,000, also when the content is edited later.
+- **Notes belong to the book, not to a copy or a file.** They work for physical books and ebooks
+  alike. `chapter` is a free-text label and `pageNumber` a reference; neither points into an ebook
+  file or is compared with the book's current page count (editions differ and books change).
+- **Markdown is stored as source and never rendered.** Note `content` and `commentary` are
+  Markdown source; a highlight's `content` is plain text. The API stores the strings verbatim
+  apart from trimming surrounding whitespace (no collapsing, quote normalization or HTML
+  sanitization, which would silently change what the reader wrote) and never returns HTML. Safe
+  rendering, including refusing raw embedded HTML, is the client's responsibility. The backend
+  never fetches, parses or executes note text.
+- **A session link is optional and permanent.** `readingSessionId` may reference only a visible
+  session of the reader **for the same book** (in progress or completed); another book's session
+  is `409 READING_SESSION_BOOK_MISMATCH`, anything else `404`. It cannot be changed after creation,
+  so thoughts stay attributed to the reading they came from, including across rereads. The notes
+  module verifies the link through a reading-service export, not the reading model.
+- **Deletion is explicit and soft.** `DELETE /notes/:id` sets `deletedAt`; the record is kept for
+  a future export, audit or restore policy, but there is no restore endpoint yet. Deleting a book
+  or completing a session never deletes or changes notes (invariant 7); a deleted book's notes are
+  hidden everywhere.
+- **Edits write only the named fields.** PATCH is one atomic owner- and not-deleted-scoped update
+  that sets or unsets exactly the fields in the request (and `chapterKey` with `chapter`), so
+  concurrent edits of different fields both persist and a concurrent delete is never undone. Two
+  edits of the same field: the last write wins, which is acceptable for a single reader's notes and
+  needs no revision counter (unlike reading sessions, notes have no cross-field rules).
+- **Search uses one compound text index** with the equality prefix `{ ownerId, deletedAt }` over
+  `title`, `content`, `commentary` and `chapter`, `default_language: 'none'` (no stemming or stop
+  words, so any language works the same; case- and diacritic-insensitive). MongoDB rejects a
+  `$text` query that lacks equality on the prefix, so search cannot escape owner and deletion
+  scoping. Quotes and hyphens are replaced with spaces before searching (the shared
+  `toTextSearchWords`), so client input never becomes a phrase or negation operator, and no regex
+  is ever built from it. Results are ordered by creation time, never by text score.
+- **No chapter index.** The planned `{ ownerId, bookId, deletedAt, chapterKey, createdAt, _id }`
+  index was left out: one book's notes are a small range of `owner_book_active_recent`, which
+  already returns them in order, so the chapter equality is applied on that range without an
+  in-memory sort (asserted with `explain`). A global chapter filter scans the reader's notes via
+  `owner_active_recent`, which is acceptable at personal-library scale. Revisit if a reader's notes
+  per book grow into the tens of thousands.
+- **Deleted books are filtered before paging.** `GET /notes` runs one aggregation that matches
+  the reader's non-deleted notes, sorts, joins only active books through the books service's
+  `keepDocumentsOfActiveBooks`, and pages with `$facet`, so totals are exact and pages have no
+  gaps. A note created while its book is being deleted may be stored but stays hidden, matching
+  the copy and reading policies; there are no transactions.
+- **Requested filters must exist.** A missing, deleted or foreign `bookId` or `readingSessionId`
+  filter returns `404` rather than an empty page, consistent with book-scoped endpoints.
