@@ -1,0 +1,34 @@
+meta {
+  name: Search notes
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/notes?q=riddle&kind=highlight
+  body: none
+  auth: bearer
+}
+
+params:query {
+  q: riddle
+  kind: highlight
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+tests {
+  test("finds the highlight whose commentary contains the word", function () {
+    expect(res.getStatus()).to.equal(200);
+    const ids = res.getBody().data.map((note) => note.id);
+    expect(ids).to.eql([bru.getVar("notesHighlightId")]);
+  });
+}
+
+docs {
+  `q` searches whole words in `title`, `content`, `commentary` and `chapter`, ignoring case and
+  diacritics. Quotes and hyphens are treated as plain text, and results are still ordered by
+  creation time, not relevance.
+}

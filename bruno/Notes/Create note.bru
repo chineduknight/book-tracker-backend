@@ -1,0 +1,82 @@
+meta {
+  name: Create note
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/books/{{notesBookId}}/notes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {
+    "kind": "note",
+    "title": "The riddle game",
+    "content": "  ## Riddles\n\nGollum and Bilbo trade *riddles*.\n\n- fair play\n- the ring  ",
+    "chapter": "Riddles in the Dark",
+    "pageNumber": 72
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("notesNoteId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public NoteDto and the Markdown kept verbatim", function () {
+    expect(res.getStatus()).to.equal(201);
+    const note = res.getBody().data;
+    expect(note).to.eql({
+      id: note.id,
+      bookId: bru.getVar("notesBookId"),
+      readingSessionId: null,
+      kind: "note",
+      content: "## Riddles\n\nGollum and Bilbo trade *riddles*.\n\n- fair play\n- the ring",
+      title: "The riddle game",
+      chapter: "Riddles in the Dark",
+      pageNumber: 72,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    });
+    expect(res.getHeader("location")).to.equal(`/api/v1/notes/${note.id}`);
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/books/:bookId/notes
+
+  Adds a note or highlight to one of the reader's active books (physical or ebook).
+  Required: `kind` (`note` | `highlight`) and `content` (trimmed; 1–20,000 characters for a note,
+  1–5,000 for a highlight). Optional: `title` (1–160), `commentary` (1–5,000), `chapter` (1–200),
+  `pageNumber` (integer 1–100,000) and `readingSessionId` (a session of this book, or `null`).
+  Unset optional fields are omitted from the response; `readingSessionId` is always present.
+
+  **201 Created**, `Location: /api/v1/notes/{id}`
+
+  ```json
+  {
+    "data": {
+      "id": "6735a1f0c2a1b2c3d4e5f620",
+      "bookId": "6735a1f0c2a1b2c3d4e5f607",
+      "readingSessionId": null,
+      "kind": "note",
+      "content": "## Riddles\n\nGollum and Bilbo trade *riddles*.\n\n- fair play\n- the ring",
+      "title": "The riddle game",
+      "chapter": "Riddles in the Dark",
+      "pageNumber": 72,
+      "createdAt": "2026-11-13T10:30:00.000Z",
+      "updatedAt": "2026-11-13T10:30:00.000Z"
+    }
+  }
+  ```
+
+  **Errors**: `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` ("Book not found" or
+  "Reading session not found"), `409 READING_SESSION_BOOK_MISMATCH`.
+}

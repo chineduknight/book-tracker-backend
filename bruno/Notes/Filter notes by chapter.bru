@@ -1,0 +1,28 @@
+meta {
+  name: Filter notes by chapter
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/notes?chapter=riddles IN the  DARK&readingSessionId={{notesSessionId}}
+  body: none
+  auth: bearer
+}
+
+params:query {
+  chapter: riddles IN the  DARK
+  readingSessionId: {{notesSessionId}}
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+tests {
+  test("matches the chapter label regardless of case and spacing", function () {
+    expect(res.getStatus()).to.equal(200);
+    const ids = res.getBody().data.map((note) => note.id);
+    expect(ids).to.eql([bru.getVar("notesHighlightId")]);
+  });
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Get deleted note
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/notes/{{notesNoteId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error).to.eql({
+      code: "NOT_FOUND",
+      message: "Note not found",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}

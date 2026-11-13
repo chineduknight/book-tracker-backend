@@ -1,0 +1,19 @@
+meta {
+  name: Notes
+  seq: 8
+}
+
+docs {
+  # Notes and highlights
+
+  Private notes about a book. `kind` is fixed at creation: a `note` is the reader's own
+  Markdown text (up to 20,000 characters) and a `highlight` is a plain-text quotation (up to
+  5,000 characters) with optional Markdown `commentary`. Either may carry a `title`, a free-text
+  `chapter` label and a `pageNumber`, and may be linked to one reading session of the same book.
+  The API stores and returns the text verbatim (only surrounding whitespace is trimmed) and never
+  renders it; a client must render Markdown safely and must not trust embedded HTML.
+
+  Run the folder in order. **Register notes reader** creates its own disposable account, and the
+  folder creates its own books and reading session, so it is independent of every other folder.
+  Contract: `docs/api-contract.md` ("Notes and highlights").
+}

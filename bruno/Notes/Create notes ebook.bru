@@ -1,0 +1,32 @@
+meta {
+  name: Create notes ebook
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {
+    "title": "The Fellowship of the Ring",
+    "format": "ebook"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("notesEbookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the ebook to annotate", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

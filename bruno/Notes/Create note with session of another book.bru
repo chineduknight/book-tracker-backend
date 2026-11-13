@@ -1,0 +1,39 @@
+meta {
+  name: Create note with session of another book
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/books/{{notesEbookId}}/notes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{notesAccessToken}}
+}
+
+body:json {
+  {
+    "kind": "note",
+    "content": "Linked to the wrong book",
+    "readingSessionId": "{{notesSessionId}}"
+  }
+}
+
+tests {
+  test("returns 409 READING_SESSION_BOOK_MISMATCH and creates nothing", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error).to.eql({
+      code: "READING_SESSION_BOOK_MISMATCH",
+      message: "The reading session belongs to a different book",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}
+
+docs {
+  The session is the reader's own but belongs to another book. A missing session, another
+  reader's session or a session of a deleted book returns `404 "Reading session not found"`.
+}
