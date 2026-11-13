@@ -47,6 +47,9 @@ These rules constrain every future module. Changing one needs an explicit decisi
   Mongoose connection is fully connected.
 - **Search:** owner-scoped MongoDB text indexes. No separate search service unless it becomes
   necessary.
+- **Node.js 26.x LTS:** the original brief specified 24.x, but Node 26 entered Active LTS on
+  2026-10-28 (Node 24 is now Maintenance LTS), so the project starts on 26 for the longer support
+  window. Pinned in `.nvmrc`, `engines` (with `engine-strict`) and CI via `.nvmrc`.
 - **TypeScript 6.0, not 7.x:** typescript-eslint (type-aware linting) supports TypeScript below
   6.1 only. Upgrade once it supports 7.x.
 - **CORS without credentials:** the API is expected to use bearer tokens, so cookies are not

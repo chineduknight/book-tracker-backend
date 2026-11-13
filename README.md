@@ -17,7 +17,7 @@ No product endpoints exist yet.
 
 | Concern         | Choice                                                        |
 | --------------- | ------------------------------------------------------------- |
-| Runtime         | Node.js 24.x LTS (`.nvmrc`, `engines`, CI)                    |
+| Runtime         | Node.js 26.x LTS (`.nvmrc`, `engines`, CI)                    |
 | Language        | TypeScript (strict), ES modules                               |
 | HTTP            | Express 5                                                     |
 | Database        | MongoDB via Mongoose                                          |
@@ -30,11 +30,11 @@ No product endpoints exist yet.
 
 ## Getting started
 
-Prerequisites: Node.js 24 (`nvm use`) and a MongoDB instance (a local `mongod` or an Atlas
+Prerequisites: Node.js 26 (`nvm use`) and a MongoDB instance (a local `mongod` or an Atlas
 cluster you create yourself).
 
 ```bash
-nvm use                 # Node 24.x; npm enforces this via engine-strict
+nvm use                 # Node 26.x; npm enforces this via engine-strict
 npm ci
 cp .env.example .env    # adjust MONGODB_URI if needed
 npm run dev             # http://localhost:3000/api/v1/health

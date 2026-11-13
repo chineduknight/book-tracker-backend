@@ -7,7 +7,7 @@
   "type": "module",
   "main": "dist/server.js",
   "engines": {
-    "node": "24.x"
+    "node": "26.x"
   },
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=.env src/server.ts | pino-pretty",
@@ -34,7 +34,7 @@
     "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.6",
     "@types/supertest": "^7.2.1",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
