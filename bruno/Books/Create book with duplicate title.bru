@@ -1,0 +1,39 @@
+meta {
+  name: Create book with duplicate title
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+body:json {
+  {
+    "title": "the hobbit",
+    "format": "ebook"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("duplicateBookId", res.getBody().data.id);
+}
+
+tests {
+  test("allows a second entry with the same title", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data).to.not.have.property("isbn");
+    expect(res.getBody().data.authors).to.eql([]);
+  });
+}
+
+docs {
+  Duplicates are never blocked: a reader may catalogue the same title twice (for example a
+  physical book and its ebook). Use **Duplicate check** to warn before creating.
+}

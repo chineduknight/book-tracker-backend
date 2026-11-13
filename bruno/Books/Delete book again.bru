@@ -1,0 +1,21 @@
+meta {
+  name: Delete book again
+  type: http
+  seq: 16
+}
+
+delete {
+  url: {{baseUrl}}/books/{{bookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND for a repeated delete", function () {
+    expect(res.getStatus()).to.equal(404);
+  });
+}

@@ -1,0 +1,34 @@
+meta {
+  name: Search books
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/books?q=tolkien&format=physical
+  body: none
+  auth: bearer
+}
+
+params:query {
+  q: tolkien
+  format: physical
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+tests {
+  test("finds the physical book by an author word", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.map((book) => book.id)).to.eql([bru.getVar("bookId")]);
+    expect(res.getBody().meta.pagination.total).to.equal(1);
+  });
+}
+
+docs {
+  `q` matches books whose title or authors contain **any** of the words: whole words,
+  case-insensitive, no stemming or prefixes. Quotes and hyphens are treated as spaces. Filters
+  and search apply to both `data` and `total`.
+}

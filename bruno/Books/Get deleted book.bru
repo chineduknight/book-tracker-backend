@@ -1,0 +1,22 @@
+meta {
+  name: Get deleted book
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/books/{{bookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND after deletion", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error.code).to.equal("NOT_FOUND");
+  });
+}

@@ -1,0 +1,32 @@
+meta {
+  name: Get missing book
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/books/64b7f0c2a1b2c3d4e5f60718
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody()).to.eql({
+      error: {
+        code: "NOT_FOUND",
+        message: "Book not found",
+        requestId: res.getHeader("x-request-id"),
+      },
+    });
+  });
+}
+
+docs {
+  Another reader's book and a deleted book return exactly this response, so ids reveal nothing.
+}

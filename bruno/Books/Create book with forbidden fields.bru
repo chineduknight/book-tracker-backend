@@ -1,0 +1,38 @@
+meta {
+  name: Create book with forbidden fields
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Stolen Book",
+    "format": "physical",
+    "ownerId": "64b7f0c2a1b2c3d4e5f60718",
+    "pageCount": 0
+  }
+}
+
+tests {
+  test("rejects the owner field and invalid values", function () {
+    expect(res.getStatus()).to.equal(400);
+    const { error } = res.getBody();
+    expect(error.code).to.equal("VALIDATION_ERROR");
+    expect(error.details.map((detail) => detail.field)).to.have.members(["ownerId", "pageCount"]);
+  });
+}
+
+docs {
+  The owner always comes from the access token. `ownerId`, `userId`, `_id`, `deletedAt`,
+  normalized fields and any other unknown field are rejected as `Unknown field`.
+}

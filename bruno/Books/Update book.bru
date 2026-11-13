@@ -1,0 +1,45 @@
+meta {
+  name: Update book
+  type: http
+  seq: 8
+}
+
+patch {
+  url: {{baseUrl}}/books/{{bookId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+body:json {
+  {
+    "title": "The Hobbit, or There and Back Again",
+    "isbn": null,
+    "coverUrl": null
+  }
+}
+
+tests {
+  test("changes given fields, clears nulls and keeps the rest", function () {
+    expect(res.getStatus()).to.equal(200);
+    const book = res.getBody().data;
+    expect(book.title).to.equal("The Hobbit, or There and Back Again");
+    expect(book).to.not.have.property("isbn");
+    expect(book).to.not.have.property("coverUrl");
+    expect(book.pageCount).to.equal(310);
+    expect(book.authors).to.eql(["J. R. R. Tolkien"]);
+  });
+}
+
+docs {
+  # PATCH /api/v1/books/:bookId
+
+  Omitted fields stay unchanged; `null` clears an optional field (`isbn`, `edition`,
+  `description`, `coverUrl`, `pageCount`, `chapterCount`, `publicationYear`); `"authors": []`
+  clears authors. `title`, `format` and `authors` cannot be `null`. An empty body is rejected.
+
+  **200 OK**: `{ "data": BookDto }`. **Errors**: `400`, `401`, `404`.
+}
