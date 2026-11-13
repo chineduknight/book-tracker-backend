@@ -1,0 +1,57 @@
+# Architecture
+
+## Why a modular monolith
+
+One user-facing product, one small team, one database: a single deployable keeps operations,
+transactions and local development simple. Organising code by business module (not by technical
+layer) keeps boundaries clear enough to extract a module later if it is ever needed.
+
+## Layout and boundaries
+
+```
+src/
+├── server.ts       process lifecycle only: config → listen → connect DB → graceful shutdown
+├── app.ts          builds the Express app; no I/O, so tests can use it directly
+├── config/         validated environment and logger (no business logic)
+├── db/             Mongoose connection lifecycle and readiness check
+├── middleware/     cross-cutting HTTP concerns (request id/logging, 404, errors)
+├── shared/         small primitives used by every module (AppError, response shapes)
+└── modules/<name>/ one folder per business module
+```
+
+Rules for modules:
+
+- A module owns its routes, request validation (Zod), service logic and Mongoose models.
+- Modules are mounted under `/api/v1` in `app.ts`.
+- Other modules use a module through its exported service functions, never by reaching into its
+  models directly.
+- Every service function takes the authenticated owner id as an explicit argument and includes it
+  in every query.
+- Handlers throw `AppError` for expected failures; the central error handler serialises them.
+
+Request flow: `request-logger (request id) → helmet → cors → json (100 kB) → /api/v1 router →
+404 → error handler`.
+
+## Runtime lifecycle
+
+- `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
+  `/health` is live immediately; `/ready` turns 200 once Mongoose reports `connected`.
+- On `SIGTERM`/`SIGINT` it stops retrying, closes the HTTP server (in-flight requests finish),
+  waits for any pending connection attempt, then disconnects Mongoose. A 10 s timer forces exit
+  if shutdown hangs.
+- Unhandled rejections and uncaught exceptions are logged as `fatal` and exit with code 1.
+
+## Future data model (design notes, not implemented)
+
+```
+User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)
+          │
+          ├─* ReadingSession              (one per read; rereads add sessions)
+          └─* Note                        (general or chapter-scoped; optional session link)
+```
+
+- Every collection carries `ownerId`, and indexes lead with it (for example
+  `{ ownerId: 1, bookId: 1 }`).
+- `Loan`: partial unique index on `{ copyId: 1 }` where `returnedAt` is null.
+- `Note`: text index for owner-scoped search, always filtered by `ownerId`.
+- `Book.format` distinguishes physical books from ebook catalogue entries; there is no file reference.
