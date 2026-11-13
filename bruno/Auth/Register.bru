@@ -1,0 +1,87 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno Reader",
+    "email": "{{testEmail}}",
+    "password": "{{testPassword}}"
+  }
+}
+
+script:pre-request {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  bru.setVar("testEmail", `bruno-${runId}@example.test`);
+  bru.setVar("testPassword", `disposable-${runId}`);
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("accessToken", res.getBody().data.tokens.accessToken);
+    bru.setVar("refreshToken", res.getBody().data.tokens.refreshToken);
+  }
+}
+
+tests {
+  test("returns 201 with exactly the user and session tokens", function () {
+    expect(res.getStatus()).to.equal(201);
+    const { user, tokens } = res.getBody().data;
+    expect(Object.keys(res.getBody().data)).to.have.members(["user", "tokens"]);
+    expect(Object.keys(user)).to.have.members(["id", "name", "email", "createdAt"]);
+    expect(Object.keys(tokens)).to.have.members([
+      "accessToken", "refreshToken", "tokenType", "expiresIn", "refreshExpiresIn",
+    ]);
+    expect(user.email).to.equal(bru.getVar("testEmail"));
+    expect(user.id).to.match(/^[0-9a-f]{24}$/);
+    expect(tokens.tokenType).to.equal("Bearer");
+    expect(tokens.expiresIn).to.equal(900);
+  });
+
+  test("is not cacheable", function () {
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/auth/register
+
+  Creates an account (active immediately; email ownership is **not** verified yet) and starts a
+  session. No authentication. Throttled per source address.
+
+  **Request**: `name` 1–100 characters (trimmed), `email` up to 254 characters (trimmed and
+  lowercased), `password` 12–128 characters (used exactly as sent). Unknown fields such as
+  `role` or `ownerId` are rejected.
+
+  **201 Created**
+
+  ```json
+  {
+    "data": {
+      "user": {
+        "id": "6735a1f0c2a1b2c3d4e5f607",
+        "name": "Jane Reader",
+        "email": "jane@example.com",
+        "createdAt": "2026-11-13T10:30:00.000Z"
+      },
+      "tokens": {
+        "accessToken": "<JWT>",
+        "refreshToken": "<opaque token>",
+        "tokenType": "Bearer",
+        "expiresIn": 900,
+        "refreshExpiresIn": 2592000
+      }
+    }
+  }
+  ```
+
+  **Errors**: `400 VALIDATION_ERROR`, `409 CONFLICT` (email already registered), `429 RATE_LIMITED`.
+}

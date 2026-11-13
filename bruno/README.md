@@ -10,7 +10,8 @@ bruno/
 ├── collection.bru          # collection-level docs
 ├── environments/local.bru  # baseUrl for a locally running API (no secrets)
 ├── Health/                 # liveness + readiness probes
-└── Errors/                 # standard error envelope examples
+├── Errors/                 # standard error envelope examples
+└── Auth/                   # register, login, current user, refresh, logout (+ error cases)
 ```
 
 ## Use the desktop app
@@ -34,6 +35,17 @@ CI) fast. The first run downloads it.
 
 `Readiness` passes with either outcome: 200 when MongoDB is connected, or 503 with the
 `SERVICE_UNAVAILABLE` error envelope when it is not. Stop MongoDB to see the 503 response.
+
+## Auth requests
+
+Run the **Auth** folder (or the whole collection) in order. **Register** creates a disposable
+user with a generated `bruno-<run id>@example.test` email and random password; later requests
+reuse them and the issued tokens through Bruno **runtime variables**, which live in memory for
+the run and are never written to the collection. To send a single request by hand in the app,
+run **Register** first.
+
+Each run creates one account and makes three registration attempts, which counts towards the
+per-address registration limit (20 per hour). Restarting the API resets the in-memory limits.
 
 ## Secrets
 

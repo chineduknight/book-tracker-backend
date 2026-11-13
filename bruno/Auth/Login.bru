@@ -1,0 +1,48 @@
+meta {
+  name: Login
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{testEmail}}",
+    "password": "{{testPassword}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("accessToken", res.getBody().data.tokens.accessToken);
+    bru.setVar("refreshToken", res.getBody().data.tokens.refreshToken);
+  }
+}
+
+tests {
+  test("returns 200 with the user and a new session", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.user.email).to.equal(bru.getVar("testEmail"));
+    expect(res.getBody().data.tokens.tokenType).to.equal("Bearer");
+  });
+
+  test("is not cacheable", function () {
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/auth/login
+
+  Starts a new session. No authentication. Email is matched case-insensitively. Response body is
+  the same shape as **Register**, with status `200 OK`.
+
+  **Errors**: `400 VALIDATION_ERROR`; `401 INVALID_CREDENTIALS` for both an unknown email and a
+  wrong password (same body and comparable Argon2id work); `429 RATE_LIMITED` after repeated
+  failures from one address or against one account (temporary, never a permanent lockout).
+}

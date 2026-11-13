@@ -1,0 +1,53 @@
+meta {
+  name: Current user
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/auth/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("returns 200 with exactly the public user", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(Object.keys(res.getBody())).to.eql(["data"]);
+    expect(Object.keys(res.getBody().data)).to.eql(["user"]);
+    expect(Object.keys(res.getBody().data.user)).to.have.members([
+      "id", "name", "email", "createdAt",
+    ]);
+    expect(res.getBody().data.user.email).to.equal(bru.getVar("testEmail"));
+  });
+}
+
+docs {
+  # GET /api/v1/auth/me
+
+  Requires `Authorization: Bearer <accessToken>`. The token must be a valid HS256 access token
+  for this API **and** its session must still be active, so logout takes effect immediately.
+
+  **200 OK**
+
+  ```json
+  {
+    "data": {
+      "user": {
+        "id": "6735a1f0c2a1b2c3d4e5f607",
+        "name": "Jane Reader",
+        "email": "jane@example.com",
+        "createdAt": "2026-11-13T10:30:00.000Z"
+      }
+    }
+  }
+  ```
+
+  **Errors**: `401 UNAUTHENTICATED` (with `WWW-Authenticate: Bearer`) for a missing, malformed,
+  expired, forged or revoked-session token, a refresh token, or more than one `Authorization`
+  header.
+}

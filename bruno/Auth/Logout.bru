@@ -1,0 +1,36 @@
+meta {
+  name: Logout
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/auth/logout
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+tests {
+  test("returns 204 with an empty body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # POST /api/v1/auth/logout
+
+  Revokes the session that owns the presented (current) refresh token. Its refresh token and
+  every access token issued for it stop working immediately.
+
+  **204 No Content**, empty body.
+
+  **Errors**: `400 VALIDATION_ERROR`; `401 INVALID_REFRESH_TOKEN` if the token is not the current
+  token of an active session (including a repeated logout); `429 RATE_LIMITED`.
+}

@@ -1,0 +1,18 @@
+meta {
+  name: Auth
+  seq: 3
+}
+
+docs {
+  # Authentication
+
+  Bearer-token API. Register or log in to get a 15-minute JWT access token and an opaque,
+  single-use refresh token (30-day absolute session). Send the access token as
+  `Authorization: Bearer <accessToken>`; exchange the refresh token at `/auth/refresh`.
+
+  Run the folder in order: **Register** generates a disposable email and password with a
+  pre-request script and stores them, and every token, only in Bruno runtime variables. Nothing
+  secret is committed and runtime variables are not written to disk.
+
+  Every auth response sends `Cache-Control: no-store`. Contract: `docs/api-contract.md`.
+}

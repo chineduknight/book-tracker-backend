@@ -1,0 +1,57 @@
+meta {
+  name: Refresh
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar("consumedRefreshToken", bru.getVar("refreshToken"));
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+    bru.setVar("accessToken", res.getBody().data.tokens.accessToken);
+    bru.setVar("refreshToken", res.getBody().data.tokens.refreshToken);
+  }
+}
+
+tests {
+  test("returns 200 with a rotated token pair", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(Object.keys(res.getBody().data)).to.eql(["tokens"]);
+    expect(res.getBody().data.tokens.refreshToken).to.not.equal(bru.getVar("consumedRefreshToken"));
+  });
+
+  test("is not cacheable", function () {
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/auth/refresh
+
+  Exchanges a refresh token for a new access token **and** a new refresh token. No
+  `Authorization` header. The presented token is single-use and the session keeps its original
+  30-day absolute expiry.
+
+  **200 OK**: `{ "data": { "tokens": SessionTokensDto } }`
+
+  **Errors**: `400 VALIDATION_ERROR`; `401 INVALID_REFRESH_TOKEN` for unknown, expired, revoked or
+  already-used tokens; `429 RATE_LIMITED`.
+
+  **Replay policy**: presenting an already-used refresh token revokes the whole session (both
+  the attacker's and the legitimate client's tokens stop working). Clients must therefore never
+  send two refreshes with the same token concurrently.
+}

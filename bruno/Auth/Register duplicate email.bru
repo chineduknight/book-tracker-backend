@@ -1,0 +1,37 @@
+meta {
+  name: Register duplicate email
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno Reader",
+    "email": "{{testEmail}}",
+    "password": "{{testPassword}}"
+  }
+}
+
+tests {
+  test("returns 409 CONFLICT without account details", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody()).to.eql({
+      error: {
+        code: "CONFLICT",
+        message: "An account with this email already exists",
+        requestId: res.getHeader("x-request-id"),
+      },
+    });
+  });
+}
+
+docs {
+  Re-registers the email created by **Register**. The 409 reveals that the address has an
+  account; this is an accepted MVP trade-off until email verification exists.
+}

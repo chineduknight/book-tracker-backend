@@ -1,0 +1,22 @@
+meta {
+  name: Current user after logout
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/auth/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+tests {
+  test("rejects an unexpired access token from the logged-out session", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getBody().error.code).to.equal("UNAUTHENTICATED");
+  });
+}
