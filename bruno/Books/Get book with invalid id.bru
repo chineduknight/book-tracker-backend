@@ -1,0 +1,24 @@
+meta {
+  name: Get book with invalid id
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/books/not-a-book-id
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+tests {
+  test("returns 400 with a bookId detail", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([
+      { field: "bookId", message: "must be a 24-character hexadecimal id" },
+    ]);
+  });
+}

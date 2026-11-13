@@ -1,0 +1,18 @@
+meta {
+  name: Books
+  seq: 4
+}
+
+docs {
+  # Book catalogue
+
+  A `Book` is a reader's private catalogue entry (a title they own or want to track), not a
+  physical copy. Every endpoint requires `Authorization: Bearer <accessToken>` and only ever sees
+  the caller's own, non-deleted books.
+
+  Run the folder in order. **Register books reader** creates its own disposable account, so this
+  folder does not depend on the Auth folder (which logs its session out). Email, password and
+  tokens live only in Bruno runtime variables.
+
+  Contract: `docs/api-contract.md` ("Books").
+}

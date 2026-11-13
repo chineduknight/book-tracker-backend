@@ -9,6 +9,7 @@ import { createAccessTokenService } from './modules/auth/access-token.js';
 import { createAuthenticationMiddleware } from './modules/auth/auth.middleware.js';
 import { DEFAULT_AUTH_RATE_LIMITS, type AuthRateLimits } from './modules/auth/auth.rate-limits.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
+import { createBooksRouter } from './modules/books/book.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
 export const API_PREFIX = '/api/v1';
@@ -58,6 +59,7 @@ export function createApp({
     AUTH_PATH,
     createAuthRouter({ accessTokens, requireAuthenticatedUser, rateLimits: authRateLimits }),
   );
+  api.use('/books', createBooksRouter({ requireAuthenticatedUser }));
   app.use(API_PREFIX, api);
 
   app.use(notFoundHandler);

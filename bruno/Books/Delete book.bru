@@ -1,0 +1,31 @@
+meta {
+  name: Delete book
+  type: http
+  seq: 14
+}
+
+delete {
+  url: {{baseUrl}}/books/{{bookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+tests {
+  test("returns 204 with an empty body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # DELETE /api/v1/books/:bookId
+
+  Soft delete: the book disappears from every endpoint but its record is kept so future reading
+  history and notes are never destroyed. There is no restore endpoint yet.
+
+  **204 No Content**. **Errors**: `400`, `401`, `404` (including a repeated delete).
+}

@@ -53,6 +53,24 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   integration tests build them before running; a production deployment should build them
   before traffic arrives.
 
+## Book catalogue
+
+- `modules/books` owns the `books` collection. Routes validate input with Zod, read the owner
+  with `authenticatedUserOf(req).userId`, call a use case in `book.service.ts`, and serialize with
+  `toPublicBook`.
+- Every service query is built from `activeBooksOwnedBy(ownerId)` (`{ ownerId, deletedAt: null }`),
+  and single-book operations add `_id`. Updates and deletes are single atomic
+  `findOneAndUpdate`/`updateOne` calls with that filter, so there is no read-then-write
+  authorisation gap.
+- Indexes, all prefixed by `{ ownerId: 1, deletedAt: 1 }`:
+  - `owner_active_recent` `{ createdAt: -1, _id: -1 }`: default and `oldest` listing.
+  - `owner_active_title` `{ normalizedTitle: 1, _id: 1 }`: title sorts and title duplicates.
+  - `owner_active_isbn` `{ normalizedIsbn: 1 }`, partial on `normalizedIsbn` existing: ISBN
+    duplicates.
+  - `owner_active_text` text on `title`, `authors`, `default_language: 'none'`: search.
+
+  The integration tests assert, with `explain`, that each query shape uses its index.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
@@ -65,7 +83,8 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 
 ## Future data model (design notes, not implemented)
 
-`User`, `Session` and `RefreshToken` exist (see above); the remaining models are design notes.
+`User`, `Session`, `RefreshToken` and `Book` exist (see above); the remaining models are design
+notes.
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)

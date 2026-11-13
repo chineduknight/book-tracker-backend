@@ -1,0 +1,42 @@
+meta {
+  name: List books
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/books?page=1&limit=20&sort=title_asc
+  body: none
+  auth: bearer
+}
+
+params:query {
+  page: 1
+  limit: 20
+  sort: title_asc
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+tests {
+  test("returns the reader's books with pagination metadata", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(Object.keys(res.getBody())).to.have.members(["data", "meta"]);
+    expect(res.getBody().meta).to.eql({
+      pagination: { page: 1, limit: 20, total: 2, totalPages: 1 },
+    });
+    expect(res.getBody().data).to.have.lengthOf(2);
+  });
+}
+
+docs {
+  # GET /api/v1/books
+
+  Query (all optional, each at most once, unknown parameters rejected): `page` (≥ 1, default 1),
+  `limit` (1–100, default 20), `q` (search words, ≤ 120 characters), `format` (`physical` |
+  `ebook`), `sort` (`recent` default, `oldest`, `title_asc`, `title_desc`; ties broken by id).
+
+  **200 OK**: `{ "data": BookDto[], "meta": { "pagination": { "page", "limit", "total", "totalPages" } } }`
+}

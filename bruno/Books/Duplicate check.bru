@@ -1,0 +1,55 @@
+meta {
+  name: Duplicate check
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/books/duplicate-check?title=The Hobbit&isbn=9780261102214
+  body: none
+  auth: bearer
+}
+
+params:query {
+  title: The Hobbit
+  isbn: 9780261102214
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+tests {
+  test("suggests both entries, newest first, with ordered reasons", function () {
+    expect(res.getStatus()).to.equal(200);
+    const { matches } = res.getBody().data;
+    expect(matches.map((match) => match.book.id)).to.eql([
+      bru.getVar("duplicateBookId"),
+      bru.getVar("bookId"),
+    ]);
+    expect(matches.map((match) => match.matchedOn)).to.eql([["title"], ["title", "isbn"]]);
+  });
+}
+
+docs {
+  # GET /api/v1/books/duplicate-check
+
+  Informational only. Query: `title` and/or `isbn` (at least one, non-blank). Titles match
+  ignoring case and extra whitespace (punctuation is kept); ISBNs match ignoring case, spaces and
+  hyphens. Returns up to 10 of the caller's non-deleted books, newest first.
+
+  **200 OK**
+
+  ```json
+  {
+    "data": {
+      "matches": [
+        { "book": { "id": "…", "title": "the hobbit", "…": "…" }, "matchedOn": ["title"] },
+        { "book": { "id": "…", "title": "The Hobbit", "…": "…" }, "matchedOn": ["title", "isbn"] }
+      ]
+    }
+  }
+  ```
+
+  **Errors**: `400 VALIDATION_ERROR`, `401 UNAUTHENTICATED`.
+}

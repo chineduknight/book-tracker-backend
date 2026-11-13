@@ -1,0 +1,31 @@
+meta {
+  name: Update book with empty body
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{baseUrl}}/books/{{bookId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+body:json {
+  {}
+}
+
+tests {
+  test("returns 400 VALIDATION_ERROR", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error).to.eql({
+      code: "VALIDATION_ERROR",
+      message: "The request contains invalid fields",
+      requestId: res.getHeader("x-request-id"),
+      details: [{ field: "body", message: "must change at least one field" }],
+    });
+  });
+}

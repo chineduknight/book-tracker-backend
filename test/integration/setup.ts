@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { RefreshTokenModel } from '../../src/modules/auth/refresh-token.model.js';
 import { SessionModel } from '../../src/modules/auth/session.model.js';
+import { BookModel } from '../../src/modules/books/book.model.js';
 import { UserModel } from '../../src/modules/users/user.model.js';
 
 const TEST_DATABASE_NAME = 'book-tracker-test';
@@ -22,6 +23,7 @@ async function deleteAuthData(): Promise<void> {
     UserModel.deleteMany({}),
     SessionModel.deleteMany({}),
     RefreshTokenModel.deleteMany({}),
+    BookModel.deleteMany({}),
   ]);
 }
 
@@ -34,6 +36,7 @@ beforeAll(async () => {
     UserModel.syncIndexes(),
     SessionModel.syncIndexes(),
     RefreshTokenModel.syncIndexes(),
+    BookModel.syncIndexes(),
   ]);
 });
 

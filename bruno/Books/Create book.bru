@@ -1,0 +1,81 @@
+meta {
+  name: Create book
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{booksAccessToken}}
+}
+
+body:json {
+  {
+    "title": "  The   Hobbit ",
+    "authors": ["J. R. R. Tolkien"],
+    "format": "physical",
+    "isbn": "978-0-261-10221-4",
+    "edition": "Reset edition",
+    "description": "There and back again.",
+    "coverUrl": "https://covers.example.com/hobbit.jpg",
+    "pageCount": 310,
+    "chapterCount": 19,
+    "publicationYear": 1937
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("bookId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public BookDto and a Location header", function () {
+    expect(res.getStatus()).to.equal(201);
+    const book = res.getBody().data;
+    expect(Object.keys(res.getBody())).to.eql(["data"]);
+    expect(Object.keys(book)).to.have.members([
+      "id", "title", "authors", "format", "isbn", "edition", "description", "coverUrl",
+      "pageCount", "chapterCount", "publicationYear", "createdAt", "updatedAt",
+    ]);
+    expect(book.id).to.match(/^[0-9a-f]{24}$/);
+    expect(book.title).to.equal("The Hobbit");
+    expect(res.getHeader("location")).to.equal(`/api/v1/books/${book.id}`);
+  });
+}
+
+docs {
+  # POST /api/v1/books
+
+  Creates a catalogue entry for the authenticated reader. `title` (1–250 characters, whitespace
+  collapsed) and `format` (`physical` | `ebook`) are required; every other field is optional and
+  omitted from the response when unset. Unknown fields such as `ownerId` are rejected.
+
+  **201 Created**, `Location: /api/v1/books/{id}`
+
+  ```json
+  {
+    "data": {
+      "id": "6735a1f0c2a1b2c3d4e5f607",
+      "title": "The Hobbit",
+      "authors": ["J. R. R. Tolkien"],
+      "format": "physical",
+      "isbn": "978-0-261-10221-4",
+      "edition": "Reset edition",
+      "description": "There and back again.",
+      "coverUrl": "https://covers.example.com/hobbit.jpg",
+      "pageCount": 310,
+      "chapterCount": 19,
+      "publicationYear": 1937,
+      "createdAt": "2026-11-13T10:30:00.000Z",
+      "updatedAt": "2026-11-13T10:30:00.000Z"
+    }
+  }
+  ```
+
+  **Errors**: `400 VALIDATION_ERROR`, `401 UNAUTHENTICATED`.
+}

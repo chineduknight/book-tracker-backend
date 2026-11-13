@@ -11,7 +11,8 @@ bruno/
 ├── environments/local.bru  # baseUrl for a locally running API (no secrets)
 ├── Health/                 # liveness + readiness probes
 ├── Errors/                 # standard error envelope examples
-└── Auth/                   # register, login, current user, refresh, logout (+ error cases)
+├── Auth/                   # register, login, current user, refresh, logout (+ error cases)
+└── Books/                  # catalogue create, duplicate check, list/search, get, update, delete
 ```
 
 ## Use the desktop app
@@ -44,8 +45,17 @@ reuse them and the issued tokens through Bruno **runtime variables**, which live
 the run and are never written to the collection. To send a single request by hand in the app,
 run **Register** first.
 
-Each run creates one account and makes three registration attempts, which counts towards the
-per-address registration limit (20 per hour). Restarting the API resets the in-memory limits.
+## Books requests
+
+The **Books** folder starts with **Register books reader**, which creates its own disposable
+account and access token (`booksAccessToken`). It does not reuse the Auth folder's tokens, which
+that folder deliberately logs out, so Books runs reliably on its own or after Auth.
+
+## Rate limits during runs
+
+A full run creates two accounts and makes four registration attempts (three in Auth, one in
+Books), which count towards the per-address registration limit (20 per hour), so about five full
+runs fit in an hour. Restarting the API resets the in-memory limits.
 
 ## Secrets
 
