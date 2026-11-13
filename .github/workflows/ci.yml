@@ -31,3 +31,47 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+
+  integration:
+    name: MongoDB integration tests and Bruno smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      MONGODB_TEST_URI: mongodb://127.0.0.1:27017/book-tracker-test
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run test:integration
+      - run: npm run build
+
+      - name: Run the Bruno collection against a live API
+        env:
+          PORT: '3000'
+          MONGODB_URI: mongodb://127.0.0.1:27017/book-tracker-smoke
+          LOG_LEVEL: warn
+        run: |
+          JWT_ACCESS_TOKEN_SECRET="$(node -e "process.stdout.write(require('node:crypto').randomBytes(32).toString('base64url'))")"
+          echo "::add-mask::$JWT_ACCESS_TOKEN_SECRET"
+          export JWT_ACCESS_TOKEN_SECRET
+          node dist/server.js &
+          for attempt in $(seq 1 30); do
+            curl --silent --fail http://127.0.0.1:3000/api/v1/ready > /dev/null && break
+            sleep 1
+          done
+          npm run api:test
