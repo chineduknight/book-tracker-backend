@@ -1,0 +1,48 @@
+meta {
+  name: Summary with overdue loan
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/dashboard/summary?asOf=2026-01-11
+  body: none
+  auth: bearer
+}
+
+params:query {
+  asOf: 2026-01-11
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+tests {
+  test("counts the library and treats the loan due 2026-01-10 as overdue", function () {
+    expect(res.getStatus()).to.equal(200);
+    const summary = res.getBody().data;
+    expect(summary.asOf).to.equal("2026-01-11");
+    expect(summary.catalogue).to.eql({ totalBooks: 2, physicalBooks: 1, ebooks: 1, physicalCopies: 2 });
+    expect(summary.reading).to.eql({
+      unreadBooks: 1, currentlyReadingBooks: 1, completedBooks: 0, booksEverCompleted: 1,
+      totalSessions: 2, completedSessions: 1, rereadSessions: 1,
+    });
+    expect(summary.notes).to.eql({ notes: 1, highlights: 1 });
+    expect(summary.wishlist).to.eql({ wanted: 1, acquired: 0 });
+    expect(summary.lending).to.eql({ activeLoans: 1, overdueLoans: 1, returnedLoans: 1 });
+  });
+
+  test("keeps the counters consistent", function () {
+    const { catalogue, reading, lending } = res.getBody().data;
+    expect(catalogue.totalBooks).to.equal(catalogue.physicalBooks + catalogue.ebooks);
+    expect(catalogue.totalBooks).to.equal(
+      reading.unreadBooks + reading.currentlyReadingBooks + reading.completedBooks,
+    );
+    expect(lending.overdueLoans).to.be.at.most(lending.activeLoans);
+  });
+}
+
+docs {
+  The rereading book is `reading` now **and** counts in `booksEverCompleted`; the wish is not a book; copies are counted separately from books.
+}

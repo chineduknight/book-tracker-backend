@@ -1,0 +1,29 @@
+meta {
+  name: Lend dashboard copy
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/copies/{{dashboardCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Ada",
+    "lentOn": "2026-01-01",
+    "dueOn": "2026-01-10"
+  }
+}
+
+tests {
+  test("lends the first copy, due 2026-01-10", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

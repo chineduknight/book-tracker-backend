@@ -1,0 +1,32 @@
+meta {
+  name: Lend second dashboard copy
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/copies/{{dashboardSecondCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Bode",
+    "lentOn": "2026-01-01"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("dashboardSecondLoanId", res.getBody().data.id);
+}
+
+tests {
+  test("lends the second copy", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

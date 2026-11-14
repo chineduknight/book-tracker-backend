@@ -1,0 +1,32 @@
+meta {
+  name: Create dashboard ebook
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Dune",
+    "format": "ebook"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("dashboardEbookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the unread ebook", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
