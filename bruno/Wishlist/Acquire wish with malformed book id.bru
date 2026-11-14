@@ -1,0 +1,30 @@
+meta {
+  name: Acquire wish with malformed book id
+  type: http
+  seq: 17
+}
+
+put {
+  url: {{baseUrl}}/wishlist/{{wishlistSecondItemId}}/acquisition
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "bookId": "not-an-id"
+  }
+}
+
+tests {
+  test("returns 400 naming bookId", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([
+      { field: "bookId", message: "must be a 24-character hexadecimal id" },
+    ]);
+  });
+}

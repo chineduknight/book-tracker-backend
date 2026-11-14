@@ -1,0 +1,32 @@
+meta {
+  name: Acquire wish with other book
+  type: http
+  seq: 15
+}
+
+put {
+  url: {{baseUrl}}/wishlist/{{wishlistItemId}}/acquisition
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "bookId": "{{wishlistOtherBookId}}"
+  }
+}
+
+tests {
+  test("returns 409 WISHLIST_ALREADY_ACQUIRED and keeps the first link", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error).to.eql({
+      code: "WISHLIST_ALREADY_ACQUIRED",
+      message: "This wishlist item was already acquired with a different book",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}

@@ -1,0 +1,28 @@
+meta {
+  name: Update wish status
+  type: http
+  seq: 10
+}
+
+patch {
+  url: {{baseUrl}}/wishlist/{{wishlistItemId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "status": "acquired"
+  }
+}
+
+tests {
+  test("refuses to change the status through PATCH", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([{ field: "status", message: "Unknown field" }]);
+  });
+}

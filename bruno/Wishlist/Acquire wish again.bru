@@ -1,0 +1,29 @@
+meta {
+  name: Acquire wish again
+  type: http
+  seq: 14
+}
+
+put {
+  url: {{baseUrl}}/wishlist/{{wishlistItemId}}/acquisition
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "bookId": "{{wishlistBookId}}"
+  }
+}
+
+tests {
+  test("is idempotent and keeps the original acquisition time", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.acquiredAt).to.equal(bru.getVar("wishlistAcquiredAt"));
+    expect(res.getBody().data.acquiredBookId).to.equal(bru.getVar("wishlistBookId"));
+  });
+}

@@ -1,0 +1,26 @@
+meta {
+  name: Get deleted wish
+  type: http
+  seq: 22
+}
+
+get {
+  url: {{baseUrl}}/wishlist/{{wishlistSecondItemId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error).to.eql({
+      code: "NOT_FOUND",
+      message: "Wishlist item not found",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}

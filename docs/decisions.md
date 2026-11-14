@@ -294,3 +294,34 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
 - **`updatedAt` of a group reflects its last change, memberships included.** Membership writes
   use the normal Mongoose timestamps, so an idempotent no-op PUT also advances it; this is
   accepted as simpler and more honest than hiding membership changes from `updatedAt`.
+
+## Wishlist decisions
+
+- **A wish is not a book.** `WishlistItem` is its own record: it never appears in the catalogue,
+  is not counted as owned, and has no copies, sessions, notes or group memberships. Duplicates
+  are allowed (of other wishes and of owned books, by title or ISBN) because a reader may want
+  another edition, format or copy; there is no unique index on title, ISBN or the acquired book.
+- **Acquisition links an existing book; it never creates one.** Creating a book and a copy from a
+  wish would need a multi-document write, which standalone MongoDB cannot make atomic. Instead
+  the client adds the book with `POST /books` and then records the acquisition, which is one
+  conditional write on the wish (`status: 'wanted'` → `'acquired'`, book id and timestamp
+  together). Several wishes may be fulfilled by the same book. `preferredFormat` is an intention
+  and is not compared with the acquired book's format.
+- **Acquired is final.** There is no un-acquire or reopen; a mistaken acquisition needs a
+  deliberately designed correction flow later. Descriptive fields stay editable on acquired items.
+  Repeating the same book is idempotent and writes nothing (so `updatedAt` and `acquiredAt` stay
+  put); a different book is `409 WISHLIST_ALREADY_ACQUIRED`.
+- **Acquisition history outlives the book.** Deleting a book never changes wishes; an acquired
+  item keeps its `acquiredBookId` as history even when that book is hidden. The client resolves
+  the book before linking to it.
+- **The book is checked before the item** on acquisition, mirroring membership writes, so two
+  unknown ids report the book. The check and the write are separate operations: a book deleted in
+  between can leave an acquired wish pointing at a hidden book, which is the accepted
+  non-transactional policy (tested). A wish deleted in between is never acquired, because the
+  write matches only active items.
+- **The default list shows wanted items.** `status` defaults to `wanted` so fulfilled wishes
+  leave the active view without being deleted; `acquired` and `all` are explicit.
+- **Priority is stored twice on purpose.** `priority` is the public value and the filter key;
+  `priorityRank` (`high` 0, `medium` 1, `low` 2) is the internal sort key written in the same
+  update, so the priority sort uses a plain ascending index.
+- **Deletion is soft** and explicit, keeping the record and any acquisition history.

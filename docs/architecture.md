@@ -169,6 +169,27 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   The integration tests assert the index definitions and, on seeded data, that the list and
   reverse lookup use them.
 
+## Wishlist
+
+- `modules/wishlist` owns the `wishlistitems` collection and serves `/wishlist`. A wishlist item is
+  a separate record from a book: nothing in the books, copies, reading, notes or group modules
+  reads it, and it never reads their models. Its only dependency is the books service's
+  `requireActiveBookOwnedByUser`, used to authorize an acquisition.
+- Every read and write is scoped by `{ ownerId, deletedAt: null }`. PATCH is one atomic
+  `findOneAndUpdate` that also keeps the internal `normalizedTitle` and `priorityRank` in step.
+  Acquisition is one conditional `findOneAndUpdate` that matches only a **wanted** item and sets
+  `status`, `acquiredBookId` and `acquiredAt` together; a request whose write misses re-reads the
+  owner's item to tell idempotent repeat (same book, no write) from conflict (different book) from
+  not found. No document is ever read and then saved unguarded.
+- Indexes, all led by `{ ownerId, deletedAt }`: `owner_active_status_recent` (the default and
+  status-filtered lists), `owner_active_title` (title sorts), `owner_active_priority` (priority
+  sort) and the `owner_active_text` text index over `title`, `authors` and `note` with
+  `default_language: 'none'`. None is unique. The planner may choose an in-memory sort for mixed
+  filter and sort combinations (for example a priority filter with the recent sort); the tests
+  assert the common shapes use their index and that nothing scans the collection.
+- Future export and statistics should treat wishes as a separate section from the owned
+  catalogue; an acquired wish refers to a book by id but is not a book.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
@@ -182,7 +203,8 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 ## Future data model (design notes, not implemented)
 
 `User`, `Session`, `RefreshToken`, `Book`, `StorageLocation`, `PhysicalCopy`, `ReadingSession`,
-`Note`, `Category` and `BookCollection` exist (see above); `Loan` is still a design note.
+`Note`, `Category`, `BookCollection` and `WishlistItem` exist (see above); `Loan` is still a
+design note.
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)
@@ -190,6 +212,7 @@ User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy
           ├─* ReadingSession              (one per read; rereads add sessions)
           ├─* Note                        (note or highlight; optional link to one session)
           └─< Category / BookCollection   (many-to-many through the group's bookIds array)
+User 1─* WishlistItem ─?→ Book            (independent until acquired; then a historical link)
 ```
 
 - Every collection carries `ownerId`, and indexes lead with it (for example

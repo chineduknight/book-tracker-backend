@@ -1,0 +1,22 @@
+meta {
+  name: Catalogue excludes wishes
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/books
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+tests {
+  test("lists only the two owned books, never wishlist items", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().meta.pagination.total).to.equal(2);
+  });
+}

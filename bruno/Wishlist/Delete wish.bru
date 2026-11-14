@@ -1,0 +1,29 @@
+meta {
+  name: Delete wish
+  type: http
+  seq: 21
+}
+
+delete {
+  url: {{baseUrl}}/wishlist/{{wishlistSecondItemId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+tests {
+  test("soft-deletes the item with 204 and no body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # DELETE /api/v1/wishlist/:wishlistItemId
+
+  Soft deletion: the record and any acquisition history stay stored, but the item disappears from
+  every wishlist endpoint. Repeating returns 404. Deleting a book never deletes wishes.
+}

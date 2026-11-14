@@ -11,8 +11,8 @@ lending history. Ebooks can be catalogued without storing any files.
 
 The API currently covers accounts and sessions, the private book catalogue, storage locations and
 physical copies, reading sessions with rereads, notes and highlights with owner-scoped text
-search, and categories and collections for organizing the catalogue. Lending and data export are
-still to come (see [Upcoming PRs](#upcoming-prs)).
+search, categories and collections for organizing the catalogue, and a wishlist of books to
+obtain. Lending and data export are still to come (see [Upcoming PRs](#upcoming-prs)).
 
 ## Stack
 
@@ -150,6 +150,12 @@ preflight and request-body errors.
 | GET                           | `/api/v1/categories/:categoryId/books`         | The category's visible books in membership order (paginated)           |
 | POST, GET, PATCH, DELETE, PUT | `/api/v1/collections...`                       | The same endpoints for reader-curated collections                      |
 | GET                           | `/api/v1/books/:bookId/organization`           | The categories and collections containing one book                     |
+| POST                          | `/api/v1/wishlist`                             | Record a book the reader wants (201 + `Location`)                      |
+| GET                           | `/api/v1/wishlist`                             | List and search wishes by status, priority and words (paginated)       |
+| GET                           | `/api/v1/wishlist/:wishlistItemId`             | One wishlist item                                                      |
+| PATCH                         | `/api/v1/wishlist/:wishlistItemId`             | Edit descriptive fields; `null` clears                                 |
+| PUT                           | `/api/v1/wishlist/:wishlistItemId/acquisition` | Link an owned book and mark the wish acquired (idempotent)             |
+| DELETE                        | `/api/v1/wishlist/:wishlistItemId`             | Soft-delete a wishlist item (204)                                      |
 
 Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
 token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
@@ -178,6 +184,7 @@ src/
 ├── modules/categories/    # subject categories: unique names per reader, ordered memberships
 ├── modules/collections/   # reader-curated collections, mirroring categories
 ├── modules/organization/  # one book's categories and collections (reverse lookup)
+├── modules/wishlist/      # wanted books, priorities, search and acquisition links to owned books
 ├── modules/health/        # liveness and readiness routes + response DTOs
 ├── modules/users/         # user model, public UserDto, user service
 └── shared/                # AppError, response envelopes, request validation, safe errors
@@ -216,9 +223,11 @@ book catalogue (create, list, search, filter, sort, update, soft delete, duplica
 storage locations and physical copies, reading sessions with rereads and a derived reading
 overview, notes and highlights (Markdown source, optional session link, owner-scoped text search,
 soft delete), categories and collections (opt-in presets, per-reader unique names, idempotent
-ordered memberships, soft delete), tests, CI, Bruno.
+ordered memberships, soft delete), a wishlist (priorities, search, explicit acquisition linking an
+owned book, soft delete), tests, CI, Bruno.
 
-Not included yet: email verification, password reset, OAuth, loans, export, nested categories,
+Not included yet: email verification, password reset, OAuth, loans, export, wish un-acquire,
+nested categories,
 membership reordering, automatic classification, book or note restore, location deletion,
 reading-session deletion, UI, deployment.
 
