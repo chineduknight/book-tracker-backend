@@ -43,3 +43,11 @@ export function toPublicWishlistItem(item: WishlistItemRecord): WishlistItemDto 
     updatedAt: item.updatedAt.toISOString(),
   };
 }
+
+export interface WishlistItemExportDto extends WishlistItemDto {
+  deletedAt: string | null;
+}
+
+export function toArchivedWishlistItem(item: WishlistItemRecord): WishlistItemExportDto {
+  return { ...toPublicWishlistItem(item), deletedAt: item.deletedAt?.toISOString() ?? null };
+}

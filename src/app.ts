@@ -14,6 +14,8 @@ import { createCategoriesRouter } from './modules/categories/category.routes.js'
 import { createCollectionsRouter } from './modules/collections/collection.routes.js';
 import { createCopiesRouter } from './modules/copies/copy.routes.js';
 import { createDashboardRouter } from './modules/dashboard/dashboard.routes.js';
+import { createExportRouter } from './modules/export/export.routes.js';
+import { EXPORT_LIMITS, type ExportLimits } from './modules/export/export.limits.js';
 import { createLoansRouter } from './modules/loans/loan.routes.js';
 import { createLocationsRouter } from './modules/locations/location.routes.js';
 import { createNotesRouter } from './modules/notes/note.routes.js';
@@ -36,6 +38,7 @@ const PRIVATE_DATA_PATHS = [
   '/wishlist',
   '/loans',
   '/dashboard',
+  '/export',
 ].map((path) => `${API_PREFIX}${path}`);
 export const JSON_BODY_LIMIT = '100kb';
 
@@ -45,6 +48,7 @@ export interface AppOptions {
   corsOrigins: readonly string[];
   accessTokenSecret: Uint8Array;
   authRateLimits?: AuthRateLimits;
+  exportLimits?: ExportLimits;
 }
 
 /** Assembles the Express application. It does not listen or connect to MongoDB. */
@@ -53,6 +57,7 @@ export function createApp({
   corsOrigins,
   accessTokenSecret,
   authRateLimits = DEFAULT_AUTH_RATE_LIMITS,
+  exportLimits = EXPORT_LIMITS,
 }: AppOptions): Express {
   const app = express();
   app.disable('x-powered-by');
@@ -66,7 +71,7 @@ export function createApp({
       origin: [...corsOrigins],
       methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'],
       allowedHeaders: ['Content-Type', 'Authorization', REQUEST_ID_HEADER],
-      exposedHeaders: [REQUEST_ID_HEADER, 'Location'],
+      exposedHeaders: [REQUEST_ID_HEADER, 'Location', 'Content-Disposition'],
       credentials: false,
       maxAge: 600,
     }),
@@ -93,6 +98,7 @@ export function createApp({
   api.use('/collections', createCollectionsRouter({ requireAuthenticatedUser }));
   api.use('/wishlist', createWishlistRouter({ requireAuthenticatedUser }));
   api.use('/dashboard', createDashboardRouter({ requireAuthenticatedUser }));
+  api.use('/export', createExportRouter({ requireAuthenticatedUser, limits: exportLimits }));
   app.use(API_PREFIX, api);
 
   app.use(notFoundHandler);

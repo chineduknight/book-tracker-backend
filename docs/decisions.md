@@ -394,3 +394,29 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
   can make two counters reflect slightly different moments. Standalone MongoDB has no transactions,
   and for a personal dashboard this bounded skew is acceptable; the catalogue and reading partition
   come from one book list and always add up.
+
+## Export decisions
+
+- **The archive is complete; normal lists are not.** The normal endpoints hide soft-deleted records
+  and records of deleted books; the JSON archive deliberately includes every stored record of the
+  reader, with `deletedAt` and every historical reference (group memberships, acquired wishes,
+  session links, loans of deleted copies), because an export that drops history would contradict
+  invariant 7. It never includes another reader's data, credentials, tokens, sessions or internal
+  database fields, and no per-record `ownerId`: the archive is not a database dump.
+- **One canonical format, friendlier views.** JSON (`schemaVersion: 1`) is lossless and suitable
+  for later import tooling; CSV and Markdown are for people. CSV escapes spreadsheet formulas with a
+  leading apostrophe and Markdown keeps user text in fences and escapes metadata, both presentation
+  changes only; the archive keeps the original text.
+- **Downloads are bounded and all-or-nothing.** 20,000 records and 32 MiB per download are V1
+  guards for a personal library; the download is built and checked before anything is sent, so an
+  oversized export is a clear `413 EXPORT_TOO_LARGE`, never a truncated file. No temp files, object
+  storage, queues or background jobs.
+- **Exports are private and sensitive.** They may contain borrower names and contacts; they are
+  sent with `no-store`, only to the signed-in reader, and their contents are never logged. Readers
+  should keep the files private.
+- **No snapshot, no writes, no import.** Sections are read one after another without transactions,
+  so a download can reflect changes made while it was assembled. Exporting never writes or repairs
+  data. Import and restore are separate future work.
+- **Tie-break tests write through the driver.** Mongoose treats `createdAt` as immutable and
+  silently drops it from model updates, so tests that force identical creation times update the
+  raw collection (`Model.collection.updateMany`).

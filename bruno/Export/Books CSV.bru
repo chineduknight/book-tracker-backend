@@ -1,0 +1,44 @@
+meta {
+  name: Books CSV
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/export/books.csv
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+tests {
+  test("is a private book-tracker-books download", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader("content-type")).to.equal("text/csv; charset=utf-8");
+    expect(res.getHeader("content-disposition")).to.match(
+      /^attachment; filename="book-tracker-books-\d{4}-\d{2}-\d{2}\.\w+"$/,
+    );
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+
+  test("has one record per book, quoted, with the formula neutralized", function () {
+    const lines = res.getBody().split("\r\n");
+    expect(lines[0]).to.equal("id,title,authors,format,isbn,edition,description,coverUrl,pageCount,chapterCount,publicationYear,createdAt,updatedAt,deletedAt");
+    expect(lines).to.have.lengthOf(4);
+    expect(lines[3]).to.equal("");
+    expect(lines[1]).to.contain('"Meditations, ""Book 1"""');
+    expect(lines[1]).to.contain('"[""Marcus Aurelius"",""Gregory Hays""]"');
+    expect(lines[2]).to.contain(`"'=SUM(1,2)"`);
+  });
+}
+
+docs {
+  # GET /api/v1/export/books.csv
+
+  One RFC 4180 record per book (deleted ones included), CRLF line endings, a header even when
+  empty. `authors` is a JSON array in one field. Cells that a spreadsheet would run as a formula
+  get a leading `'`; the JSON archive keeps the original text.
+}

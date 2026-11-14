@@ -46,3 +46,12 @@ export function toPublicBook(book: BookRecord): BookDto {
     updatedAt: book.updatedAt.toISOString(),
   };
 }
+
+/** A book in the archive: the public fields plus when it was deleted, if it was. */
+export interface BookExportDto extends BookDto {
+  deletedAt: string | null;
+}
+
+export function toArchivedBook(book: BookRecord): BookExportDto {
+  return { ...toPublicBook(book), deletedAt: book.deletedAt?.toISOString() ?? null };
+}
