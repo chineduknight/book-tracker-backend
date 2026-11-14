@@ -7,7 +7,7 @@ This document defines shared HTTP behavior. Every implemented endpoint must addi
 - Base path: `/api/v1`.
 - JSON responses use `Content-Type: application/json`; `204 No Content` has no body.
 - All responses include an `X-Request-Id` header. Error responses also include `requestId` in the body if one was assigned.
-- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories` and `/api/v1/collections` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
+- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories`, `/api/v1/collections` and `/api/v1/wishlist` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
 - CORS exposes `X-Request-Id` and `Location` to allowed browser origins.
 - **Logging:** request logs contain the method, the URL path (which includes resource ids such as `/api/v1/books/{id}`), the status and the request id. Query strings, headers and bodies are never logged, so titles, search terms, location names, notes, emails, passwords and tokens never reach the logs.
 - Public IDs are strings named `id`, not MongoDB `_id`; never return `__v` or internal model fields.
@@ -79,18 +79,18 @@ Every error uses the established envelope:
 
 `details` is optional, contains only safe field-level feedback, and must not expose credentials, database messages, or input secrets. Known error bodies use a safe, stable `code` and human-readable `message`.
 
-| Status                       | Intended use                                                                    | Example code                                                                                                                                                                                 |
-| ---------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                                                                                                                                           |
-| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN`                                                                                                                            |
-| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                                                                                                                                                  |
-| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                                                                                                                                                  |
-| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`, `READING_SESSION_IN_PROGRESS`, `INVALID_READING_TRANSITION`, `READING_SESSION_UPDATE_CONFLICT`, `READING_SESSION_BOOK_MISMATCH` |
-| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                                                                                                                                                          |
-| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                                                                                                                                                     |
-| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                                                                                                                                               |
-| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                                                                                                                                             |
-| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                                                                                                                                                        |
+| Status                       | Intended use                                                                    | Example code                                                                                                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                                                                                                                                                                        |
+| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN`                                                                                                                                                         |
+| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                                                                                                                                                                               |
+| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                                                                                                                                                                               |
+| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`, `READING_SESSION_IN_PROGRESS`, `INVALID_READING_TRANSITION`, `READING_SESSION_UPDATE_CONFLICT`, `READING_SESSION_BOOK_MISMATCH`, `WISHLIST_ALREADY_ACQUIRED` |
+| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                                                                                                                                                                                       |
+| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                                                                                                                                                                                  |
+| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                                                                                                                                                                            |
+| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                                                                                                                                                                          |
+| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                                                                                                                                                                                     |
 
 Do not change existing implemented error codes merely to match these suggested names; preserve current behavior or propose an explicit breaking-change decision. Avoid `200` responses that represent errors inside `data`.
 
@@ -524,7 +524,7 @@ Memberships are never part of a group DTO; a group's books are read through its 
 | `GET`    | `/api/v1/{kind}/:id/books`                   | Query: `page`, `limit`                                 | `200` `{ "data": BookDto[], "meta": { "pagination" } }`                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                                                  |
 | `GET`    | `/api/v1/books/:bookId/organization`         | —                                                      | `200` `{ "data": BookOrganizationDto }`                                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found"                                                 |
 
-`{kind}` is `categories` (route parameter `categoryId`) or `collections` (`collectionId`). Responses under `/api/v1/categories` and `/api/v1/collections` send `Cache-Control: no-store`, like the other private paths; the organization endpoint inherits the `/api/v1/books` rule.
+`{kind}` is `categories` (route parameter `categoryId`) or `collections` (`collectionId`). Responses under `/api/v1/categories`, `/api/v1/collections` and `/api/v1/wishlist` send `Cache-Control: no-store`, like the other private paths; the organization endpoint inherits the `/api/v1/books` rule.
 
 - **Presets** are a fixed, read-only suggestion list in a deterministic order: `Fiction`, `Nonfiction`, `Biography`, `History`, `Philosophy`, `Psychology`, `Science`, `Technology`, `Religion`, `Personal Development`. They are never stored and never depend on the account: registering creates no categories, listing creates none, and a reader who created or deleted `Philosophy` still sees it suggested. A reader materializes a category only with `POST /categories`, with any name, preset or not.
 - **Fields (strict; `ownerId`, `normalizedName`, `bookIds`, `deletedAt`, `id` and any other field are rejected as `Unknown field`):** `name` is trimmed with inner whitespace collapsed, 1–100 characters, and cannot be `null`; `description` is trimmed, 1–500 characters, and on PATCH `null` clears it. Blank strings are rejected.
@@ -535,6 +535,75 @@ Memberships are never part of a group DTO; a group's books are read through its 
 - **Organization** (`GET /books/:bookId/organization`) lists the reader's active categories and collections that contain the book, each alphabetical; both lists are `[]` for an unorganized book. A missing, foreign or deleted book returns `404 "Book not found"`; deleted groups never appear.
 - **Deletion is soft:** `DELETE /{kind}/:id` returns `204` with no body, after which the group and its memberships behave as missing everywhere (get, list, PATCH, delete, memberships, books list, organization) and a repeated delete returns `404`. The record is kept; no book, copy, reading session, note or loan is changed. Deleting a book hides it from every group it was in (and from totals) without changing the groups; its membership id may stay stored.
 - **Logging:** request logs record only method, path (with ids), status and request id; names, descriptions, titles and query strings are never logged, and error responses never echo submitted names.
+
+### Wishlist management
+
+A wishlist item records a book the reader **hopes to obtain**. It is not a catalogue book: it never appears in `GET /books`, is not counted as owned, has no copies, reading sessions, notes or group memberships, and duplicates (of other wishes or of owned books, by title or ISBN) are allowed because a reader may want another edition or copy. When the reader obtains the book, they add it to the catalogue with `POST /books` and then record the **acquisition**, which links the wish to that existing owned book. The API never creates a book or a copy from a wish. Every endpoint requires a bearer access token. DTO: `src/modules/wishlist/wishlist.dto.ts`. Bruno: `bruno/Wishlist/`.
+
+```ts
+type WishlistPriority = 'low' | 'medium' | 'high';
+type WishlistStatus = 'wanted' | 'acquired';
+
+interface WishlistItemDto {
+  id: string; // 24-character lowercase hex
+  title: string;
+  authors: string[]; // [] when none
+  isbn?: string; // omitted when unset
+  preferredFormat?: 'physical' | 'ebook'; // a preference, not a constraint on the acquired book
+  coverUrl?: string;
+  sourceUrl?: string; // store, publisher or reference link; never fetched by the API
+  priority: WishlistPriority; // always present
+  note?: string; // personal purchase or research note, not a reading note
+  status: WishlistStatus;
+  acquiredBookId: string | null; // always present; null until acquired
+  acquiredAt?: string; // ISO 8601 UTC, only once acquired
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC
+}
+```
+
+| Method   | Path                                           | Request                                     | Success                                                                | Errors                                                                                                                       |
+| -------- | ---------------------------------------------- | ------------------------------------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `POST`   | `/api/v1/wishlist`                             | Item fields                                 | `201` `{ "data": WishlistItemDto }`, `Location: /api/v1/wishlist/{id}` | `400 VALIDATION_ERROR`, `401`                                                                                                |
+| `GET`    | `/api/v1/wishlist`                             | Wishlist query                              | `200` `{ "data": WishlistItemDto[], "meta": { "pagination" } }`        | `400 VALIDATION_ERROR`, `401`                                                                                                |
+| `GET`    | `/api/v1/wishlist/:wishlistItemId`             | —                                           | `200` `{ "data": WishlistItemDto }`                                    | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Wishlist item not found"                                                     |
+| `PATCH`  | `/api/v1/wishlist/:wishlistItemId`             | Fields to change, at least one              | `200` `{ "data": WishlistItemDto }`                                    | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                                                               |
+| `PUT`    | `/api/v1/wishlist/:wishlistItemId/acquisition` | `{ "bookId": "<24-hex id>" }`, nothing else | `200` `{ "data": WishlistItemDto }`                                    | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found" / "Wishlist item not found", `409 WISHLIST_ALREADY_ACQUIRED` |
+| `DELETE` | `/api/v1/wishlist/:wishlistItemId`             | —                                           | `204`, empty body                                                      | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                                                               |
+
+Responses under `/api/v1/wishlist` send `Cache-Control: no-store`, like the other private paths.
+
+**Fields (strict; `status`, `acquiredBookId`, `acquiredAt`, `ownerId`, `bookId`, `id`, `deletedAt`, `createdAt`, `normalizedTitle`, `priorityRank` and any other field are rejected as `Unknown field`):**
+
+| Field             | Rules                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------- |
+| `title`           | required; inner whitespace collapsed, 1–250 characters; cannot be `null`                          |
+| `authors`         | up to 20 trimmed, non-blank names of at most 120 characters; `[]` by default and allowed on PATCH |
+| `isbn`            | trimmed, at most 32 characters with at least one letter or digit; no checksum                     |
+| `preferredFormat` | `physical` or `ebook`                                                                             |
+| `coverUrl`        | absolute http or https URL, at most 2,048 characters; external only                               |
+| `sourceUrl`       | absolute http or https URL, at most 2,048 characters; stored as text, never fetched               |
+| `priority`        | `low`, `medium` (default on create) or `high`; cannot be `null`                                   |
+| `note`            | trimmed, 1–2,000 characters                                                                       |
+
+- **Create** needs only `title`; `authors` default to `[]`, `priority` to `medium`, `status` to `wanted`, and `acquiredBookId` is `null`.
+- **PATCH** changes a non-empty subset of the fields above on a wanted **or** acquired item; omitted fields are unchanged and `null` clears `isbn`, `preferredFormat`, `coverUrl`, `sourceUrl` or `note`. It never changes `status` or the acquisition facts. Each PATCH is one atomic write that sets exactly the named fields (keeping the internal normalized title and priority rank in step), so concurrent edits of different fields both persist; for the same field the last write wins.
+- **Acquisition** (`PUT .../acquisition`) requires exactly `bookId`, one of the reader's **active** books (physical or ebook, whatever the wish's `preferredFormat`). It changes `wanted` to `acquired` and records `acquiredBookId` and `acquiredAt` in one conditional write. The book is checked first: a malformed id gives `400` naming `bookId`; a missing, deleted or foreign book gives `404 "Book not found"`; then a missing, deleted or foreign item gives `404 "Wishlist item not found"` (so two unknown ids report the book). Repeating with the **same** book (in any hex case) is idempotent: `200` with the original `acquiredAt` and `updatedAt`, nothing written. A **different** book on an acquired item returns `409 { "error": { "code": "WISHLIST_ALREADY_ACQUIRED", "message": "This wishlist item was already acquired with a different book", "requestId": "<id>" } }` and changes nothing. Concurrent acquisitions settle on exactly one book and one timestamp; the losers with another book get `409`. The linked book is not modified and no copy is created; several wishes may be fulfilled by the same book.
+- **Acquired is final.** There is no un-acquire or reopen endpoint; descriptive fields can still be corrected. If the linked book is later deleted, the item keeps `status: acquired` and its `acquiredBookId` as history; clients should resolve the book before offering navigation to it.
+- **Deletion is soft:** `DELETE` returns `204` with no body; the record and any acquisition history stay stored, the item behaves as missing everywhere (get, PATCH, acquisition, delete, lists, search, totals) and a repeated delete returns `404`. Deleting a book never deletes or changes wishes.
+- **Visibility:** a missing item, another reader's item and a deleted item all return the same `404 "Wishlist item not found"`.
+
+**Wishlist query** (each parameter at most once; unknown parameters rejected):
+
+| Parameter       | Rules                                                                                                                                                                                                                                                    |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page`, `limit` | `page` ≥ 1 (default 1), `limit` 1–100 (default 20)                                                                                                                                                                                                       |
+| `status`        | `wanted` (default, so fulfilled wishes leave the active view), `acquired` or `all` (both statuses; never deleted items)                                                                                                                                  |
+| `priority`      | `low`, `medium` or `high`                                                                                                                                                                                                                                |
+| `q`             | trimmed, 1–120 characters with at least one letter or digit; whole-word search over `title`, `authors` and `note`, case- and diacritic-insensitive, matching any of the words; quotes and hyphens are plain text, never operators or regular expressions |
+| `sort`          | `recent` (default, newest first), `oldest`, `title_asc`, `title_desc` (by the case-insensitive title) or `priority` (high first, newest within a priority); ties always broken by `id` in the same direction                                             |
+
+Totals reflect all filters before paging; an empty result is `data: []` with `{ "page": 1, "limit": 20, "total": 0, "totalPages": 0 }`. Request logs hold only method, path (with ids), status and request id; titles, authors, notes, URLs and query strings are never logged, and validation errors never echo submitted text.
 
 ### Responses on any path
 
