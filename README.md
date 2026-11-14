@@ -12,8 +12,8 @@ lending history. Ebooks can be catalogued without storing any files.
 The API currently covers accounts and sessions, the private book catalogue, storage locations and
 physical copies, reading sessions with rereads, notes and highlights with owner-scoped text
 search, categories and collections for organizing the catalogue, a wishlist of books to obtain,
-lending of physical copies with full history, and a derived Home dashboard with reading
-statistics. Data export is still to come (see [Upcoming PRs](#upcoming-prs)).
+lending of physical copies with full history, a derived Home dashboard with reading statistics,
+and private downloads of all of a reader's data (a complete JSON archive, CSV and Markdown).
 
 ## Stack
 
@@ -167,6 +167,11 @@ preflight and request-body errors.
 | GET                           | `/api/v1/dashboard/summary`                    | Derived library counts; overdue loans as of `asOf` (UTC today by default) |
 | GET                           | `/api/v1/dashboard/reading-statistics`         | Reading buckets, lifetime completions and rereads, overall and by format  |
 | GET                           | `/api/v1/dashboard/recent-activity`            | The newest recorded books, sessions, notes, wishes and loans (ids only)   |
+| GET                           | `/api/v1/export/archive`                       | Complete JSON archive of the reader's data, soft-deleted records included |
+| GET                           | `/api/v1/export/books.csv`                     | Books as CSV (deleted ones included)                                      |
+| GET                           | `/api/v1/export/reading-sessions.csv`          | Reading sessions as CSV                                                   |
+| GET                           | `/api/v1/export/loans.csv`                     | Loans as CSV, with borrower details                                       |
+| GET                           | `/api/v1/export/notes.md`                      | Notes and highlights as Markdown                                          |
 
 Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
 token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
@@ -198,6 +203,7 @@ src/
 ├── modules/wishlist/      # wanted books, priorities, search and acquisition links to owned books
 ├── modules/loans/         # lending of physical copies: one active loan per copy, full history
 ├── modules/dashboard/     # read-only derived summary, reading statistics and recent activity
+├── modules/export/        # bounded private downloads: JSON archive, CSV and Markdown
 ├── modules/health/        # liveness and readiness routes + response DTOs
 ├── modules/users/         # user model, public UserDto, user service
 └── shared/                # AppError, response envelopes, request validation, safe errors
@@ -239,15 +245,15 @@ soft delete), categories and collections (opt-in presets, per-reader unique name
 ordered memberships, soft delete), a wishlist (priorities, search, explicit acquisition linking an
 owned book, soft delete), lending (one active loan per copy enforced by the database, returns,
 overdue view, history that survives copy deletion), a read-only dashboard (summary, reading
-statistics, recent activity), tests, CI, Bruno.
+statistics, recent activity), data export (complete JSON archive with soft-deleted records, CSV,
+Markdown, bounded and private), tests, CI, Bruno.
 
-Not included yet: email verification, password reset, OAuth, export, loan reminders, wish un-acquire,
+Not included yet: email verification, password reset, OAuth, import/restore, loan reminders, wish un-acquire,
 nested categories,
 membership reordering, automatic classification, book or note restore, location deletion,
 reading-session deletion, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Export & data portability**: full per-user data export.
-2. **Backend hardening** across modules.
-3. **Deployment and operations.**
+1. **Backend hardening** across modules (security, performance, robustness).
+2. **Deployment and operations.**

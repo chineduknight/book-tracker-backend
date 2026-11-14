@@ -1,0 +1,31 @@
+meta {
+  name: Create export category
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/categories
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+body:json {
+  {
+    "name": "Stoicism"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("exportCategoryId", res.getBody().data.id);
+}
+
+tests {
+  test("creates a category", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

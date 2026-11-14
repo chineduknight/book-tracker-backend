@@ -1,9 +1,12 @@
 import mongoose, { type PipelineStage, type Types } from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import {
+  toArchivedBook,
   toPublicBook,
   type BookDto,
+  type BookExportDto,
   type BookFormat,
   type DuplicateSuggestionDto,
 } from './book.dto.js';
@@ -307,4 +310,31 @@ export async function listRecentlyAddedBooks(
     .select({ createdAt: 1 })
     .lean();
   return books.map((book) => ({ bookId: book._id.toHexString(), createdAt: book.createdAt }));
+}
+
+/** Every book of the owner, deleted ones included, oldest first, for the data export. */
+export async function* streamBooksForArchive(ownerId: string): AsyncGenerator<BookExportDto> {
+  for await (const book of BookModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor()) {
+    yield toArchivedBook(book);
+  }
+}
+
+export interface ArchivedBookTitle {
+  bookId: string;
+  title: string;
+  isDeleted: boolean;
+}
+
+/** Id and title of every book of the owner, deleted ones included, for labelling exports. */
+export async function* streamBookTitlesForArchive(
+  ownerId: string,
+): AsyncGenerator<ArchivedBookTitle> {
+  const books = BookModel.find({ ownerId })
+    .sort(ARCHIVE_ORDER)
+    .select({ title: 1, deletedAt: 1 })
+    .lean()
+    .cursor();
+  for await (const book of books) {
+    yield { bookId: book._id.toHexString(), title: book.title, isDeleted: book.deletedAt != null };
+  }
 }

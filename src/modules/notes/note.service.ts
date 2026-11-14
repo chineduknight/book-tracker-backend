@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { invalidFieldsError } from '../../shared/request-validation.js';
 import { toTextSearchWords } from '../../shared/text.js';
@@ -9,7 +10,7 @@ import {
   requireActiveBookOwnedByUser,
 } from '../books/book.service.js';
 import { requireBookIdOfVisibleReadingSession } from '../reading/reading.service.js';
-import { toPublicNote, type NoteDto } from './note.dto.js';
+import { toArchivedNote, toPublicNote, type NoteDto, type NoteExportDto } from './note.dto.js';
 import { NoteModel, type NoteRecord } from './note.model.js';
 import { problemsWithContentLength, toChapterKey } from './note.rules.js';
 import type {
@@ -276,4 +277,11 @@ export async function listRecentlyAddedNotes(
     kind,
     createdAt,
   }));
+}
+
+/** Every note of the owner, deleted ones and those of deleted books included, oldest first. */
+export async function* streamNotesForArchive(ownerId: string): AsyncGenerator<NoteExportDto> {
+  for await (const note of NoteModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor()) {
+    yield toArchivedNote(note);
+  }
 }

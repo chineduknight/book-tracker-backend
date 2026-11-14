@@ -1,0 +1,21 @@
+meta {
+  name: Delete export ebook
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/books/{{exportEbookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+tests {
+  test("soft-deletes the ebook", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

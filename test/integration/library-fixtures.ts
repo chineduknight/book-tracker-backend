@@ -155,6 +155,21 @@ export function dashboardApiFor(app: Express, accessToken: string) {
   };
 }
 
+export function exportApiFor(app: Express, accessToken: string) {
+  const authorized = authorizedWith(accessToken);
+  const download =
+    (file: string) =>
+    (query: Record<string, string> | string = {}) =>
+      authorized(request(app).get(`/api/v1/export/${file}`)).query(query);
+  return {
+    archive: download('archive'),
+    booksCsv: download('books.csv'),
+    readingSessionsCsv: download('reading-sessions.csv'),
+    loansCsv: download('loans.csv'),
+    notesMarkdown: download('notes.md'),
+  };
+}
+
 export function wishlistApiFor(app: Express, accessToken: string) {
   const authorized = authorizedWith(accessToken);
   return {
@@ -185,6 +200,7 @@ export async function signInLibraryReader(app: Express) {
     wishlist: wishlistApiFor(app, tokens.accessToken),
     loans: loansApiFor(app, tokens.accessToken),
     dashboard: dashboardApiFor(app, tokens.accessToken),
+    exports: exportApiFor(app, tokens.accessToken),
     presets: () =>
       authorizedWith(tokens.accessToken)(request(app).get('/api/v1/categories/presets')),
     organizationOf: (bookId: string) =>

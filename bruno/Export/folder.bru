@@ -1,0 +1,20 @@
+meta {
+  name: Export
+  seq: 14
+}
+
+docs {
+  # Export
+
+  Private downloads of the reader's own data. The **JSON archive** is the complete, portable
+  record: every stored record, **soft-deleted ones included** with their `deletedAt`, and every
+  historical reference. The CSV files (books, reading sessions, loans) and the Markdown notes file
+  are friendlier views, not replacements for the archive. Downloads may contain borrower contact
+  details: keep them private.
+
+  Run the folder in order. **Register export reader** creates its own disposable account, checks
+  the empty exports, then builds a small library (a book with a quoted title, an ebook later
+  deleted, a copy, a reading session, a note with backticks, a loan and a category) and checks the
+  populated downloads. It is independent of every other folder.
+  Contract: `docs/api-contract.md` ("Export").
+}

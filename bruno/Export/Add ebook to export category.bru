@@ -1,0 +1,21 @@
+meta {
+  name: Add ebook to export category
+  type: http
+  seq: 12
+}
+
+put {
+  url: {{baseUrl}}/categories/{{exportCategoryId}}/books/{{exportEbookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+tests {
+  test("adds the ebook to the category", function () {
+    expect(res.getStatus()).to.equal(204);
+  });
+}

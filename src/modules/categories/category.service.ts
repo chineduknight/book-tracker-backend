@@ -1,5 +1,6 @@
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { toCaseInsensitiveKey } from '../../shared/text.js';
 import {
@@ -7,7 +8,12 @@ import {
   requireActiveBookOwnedByUser,
   type BookPage,
 } from '../books/book.service.js';
-import { toPublicCategory, type CategoryDto } from './category.dto.js';
+import {
+  toArchivedCategory,
+  toPublicCategory,
+  type CategoryDto,
+  type CategoryExportDto,
+} from './category.dto.js';
 import { CategoryModel } from './category.model.js';
 import type { CategoryChanges, CategoryListQuery, NewCategory } from './category.schema.js';
 
@@ -166,4 +172,16 @@ export async function findCategoriesContainingBook(
     .sort(ALPHABETICAL)
     .lean();
   return categories.map(toPublicCategory);
+}
+
+/** Every category of the owner, deleted ones included, oldest first, for the data export. */
+export async function* streamCategoriesForArchive(
+  ownerId: string,
+): AsyncGenerator<CategoryExportDto> {
+  for await (const category of CategoryModel.find({ ownerId })
+    .sort(ARCHIVE_ORDER)
+    .lean()
+    .cursor()) {
+    yield toArchivedCategory(category);
+  }
 }

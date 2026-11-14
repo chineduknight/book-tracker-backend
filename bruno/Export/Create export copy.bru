@@ -1,0 +1,29 @@
+meta {
+  name: Create export copy
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/books/{{exportBookId}}/copies
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+body:json {
+  {}
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("exportCopyId", res.getBody().data.id);
+}
+
+tests {
+  test("creates a copy", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

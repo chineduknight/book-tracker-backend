@@ -1,0 +1,48 @@
+meta {
+  name: Populated archive
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/export/archive
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+tests {
+  test("is a private book-tracker-export download", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader("content-type")).to.equal("application/json; charset=utf-8");
+    expect(res.getHeader("content-disposition")).to.match(
+      /^attachment; filename="book-tracker-export-\d{4}-\d{2}-\d{2}\.\w+"$/,
+    );
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+
+  test("keeps the soft-deleted ebook and its category membership", function () {
+    const archive = res.getBody().data;
+    expect(archive.books.map((book) => book.id)).to.eql([
+      bru.getVar("exportBookId"),
+      bru.getVar("exportEbookId"),
+    ]);
+    expect(archive.books[0].deletedAt).to.equal(null);
+    expect(archive.books[1].deletedAt).to.be.a("string");
+    expect(archive.categories[0].bookIds).to.eql([bru.getVar("exportEbookId")]);
+    expect(archive.copies).to.have.lengthOf(1);
+    expect(archive.readingSessions[0].completedOn).to.equal("2026-01-02");
+    expect(archive.notes[0].content).to.equal("Use ``` fences\n# not a heading");
+    expect(archive.loans[0].borrowerContact).to.equal("ada@example.test");
+  });
+
+  test("contains no owner, credential or internal fields", function () {
+    const text = JSON.stringify(res.getBody());
+    for (const forbidden of ["ownerId", "passwordHash", "normalizedTitle", "revision", "__v", "\"_id\""]) {
+      expect(text).to.not.contain(forbidden);
+    }
+  });
+}

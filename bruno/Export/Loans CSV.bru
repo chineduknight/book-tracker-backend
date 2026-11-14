@@ -1,0 +1,37 @@
+meta {
+  name: Loans CSV
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/export/loans.csv
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+tests {
+  test("is a private book-tracker-loans download", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader("content-type")).to.equal("text/csv; charset=utf-8");
+    expect(res.getHeader("content-disposition")).to.match(
+      /^attachment; filename="book-tracker-loans-\d{4}-\d{2}-\d{2}\.\w+"$/,
+    );
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+
+  test("has the active loan with borrower details and an empty returnedOn", function () {
+    const lines = res.getBody().split("\r\n");
+    expect(lines[0]).to.equal("id,copyId,bookId,borrowerName,borrowerContact,lentOn,dueOn,returnedOn,note,createdAt,updatedAt");
+    expect(lines).to.have.lengthOf(3);
+    expect(lines[1]).to.contain(",Ada Okafor,ada@example.test,2026-01-01,,,,");
+  });
+}
+
+docs {
+  Loans may contain borrower contact details; the file is for the signed-in reader only and should be kept private.
+}

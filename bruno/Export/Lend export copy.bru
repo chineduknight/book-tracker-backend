@@ -1,0 +1,29 @@
+meta {
+  name: Lend export copy
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/copies/{{exportCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Ada Okafor",
+    "borrowerContact": "ada@example.test",
+    "lentOn": "2026-01-01"
+  }
+}
+
+tests {
+  test("lends the copy", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

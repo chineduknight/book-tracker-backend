@@ -1,0 +1,33 @@
+meta {
+  name: Create export book
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Meditations, \"Book 1\"",
+    "authors": ["Marcus Aurelius", "Gregory Hays"],
+    "format": "physical"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("exportBookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates a book whose title needs CSV quoting", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

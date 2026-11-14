@@ -1,5 +1,6 @@
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { toCaseInsensitiveKey } from '../../shared/text.js';
 import {
@@ -7,7 +8,12 @@ import {
   requireActiveBookOwnedByUser,
   type BookPage,
 } from '../books/book.service.js';
-import { toPublicBookCollection, type BookCollectionDto } from './collection.dto.js';
+import {
+  toArchivedBookCollection,
+  toPublicBookCollection,
+  type BookCollectionDto,
+  type BookCollectionExportDto,
+} from './collection.dto.js';
 import { BookCollectionModel } from './collection.model.js';
 import type { CollectionChanges, CollectionListQuery, NewCollection } from './collection.schema.js';
 
@@ -174,4 +180,14 @@ export async function findCollectionsContainingBook(
     .sort(ALPHABETICAL)
     .lean();
   return collections.map(toPublicBookCollection);
+}
+
+/** Every collection of the owner, deleted ones included, oldest first, for the data export. */
+export async function* streamCollectionsForArchive(
+  ownerId: string,
+): AsyncGenerator<BookCollectionExportDto> {
+  const collections = BookCollectionModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor();
+  for await (const collection of collections) {
+    yield toArchivedBookCollection(collection);
+  }
 }

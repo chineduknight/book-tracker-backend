@@ -1,0 +1,32 @@
+meta {
+  name: Empty notes Markdown
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/export/notes.md
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+tests {
+  test("is a private book-tracker-notes download", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader("content-type")).to.equal("text/markdown; charset=utf-8");
+    expect(res.getHeader("content-disposition")).to.match(
+      /^attachment; filename="book-tracker-notes-\d{4}-\d{2}-\d{2}\.\w+"$/,
+    );
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+
+  test("is a short valid document", function () {
+    expect(res.getBody()).to.contain("# Book Tracker notes and highlights");
+    expect(res.getBody()).to.contain("- Entries: 0");
+    expect(res.getBody()).to.contain("No notes or highlights yet.");
+  });
+}

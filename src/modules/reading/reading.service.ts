@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { invalidFieldsError } from '../../shared/request-validation.js';
 import {
@@ -362,4 +363,14 @@ export async function listRecentlyRecordedSessions(
     bookId: bookId.toHexString(),
     createdAt,
   }));
+}
+
+/** Every session of the owner, including those of deleted books, oldest first, for the export. */
+export async function* streamReadingSessionsForArchive(
+  ownerId: string,
+): AsyncGenerator<ReadingSessionDto> {
+  const sessions = ReadingSessionModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor();
+  for await (const session of sessions) {
+    yield toPublicReadingSession(session);
+  }
 }

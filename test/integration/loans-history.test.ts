@@ -152,7 +152,7 @@ describe('GET /api/v1/loans', () => {
       const copy = await addCopy(reader, book.id, { label });
       ids.push((await lendCopy(reader, copy.id)).id);
     }
-    await LoanModel.updateMany({}, { $set: { createdAt: SAME_INSTANT } });
+    await LoanModel.collection.updateMany({}, { $set: { createdAt: SAME_INSTANT } });
     const ascending = [...ids].sort();
 
     expect(idsOf(await reader.loans.listAll())).toEqual([...ascending].reverse());

@@ -1,0 +1,33 @@
+meta {
+  name: Reading sessions CSV
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/export/reading-sessions.csv
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+tests {
+  test("is a private book-tracker-reading-sessions download", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader("content-type")).to.equal("text/csv; charset=utf-8");
+    expect(res.getHeader("content-disposition")).to.match(
+      /^attachment; filename="book-tracker-reading-sessions-\d{4}-\d{2}-\d{2}\.\w+"$/,
+    );
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+
+  test("has one record per session with empty progress columns", function () {
+    const lines = res.getBody().split("\r\n");
+    expect(lines[0]).to.equal("id,bookId,status,progressUnit,progressValue,startedOn,completedOn,rating,summary,createdAt,updatedAt");
+    expect(lines).to.have.lengthOf(3);
+    expect(lines[1]).to.contain(",completed,,,,2026-01-02,");
+  });
+}

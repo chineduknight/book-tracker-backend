@@ -81,7 +81,7 @@ describe('GET /api/v1/books/:bookId/notes', () => {
     const reader = await signInLibraryReader(createAuthTestApp());
     const book = await addPhysicalBook(reader);
     const ids = await addNotes(reader, book.id, 4);
-    await NoteModel.updateMany({}, { $set: { createdAt: SAME_INSTANT } });
+    await NoteModel.collection.updateMany({}, { $set: { createdAt: SAME_INSTANT } });
     const ascendingIds = [...ids].sort();
 
     const recent = await reader.notes.listForBook(book.id);
