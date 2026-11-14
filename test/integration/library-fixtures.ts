@@ -6,6 +6,11 @@ import type { BookDto } from '../../src/modules/books/book.dto.js';
 import type { CategoryDto } from '../../src/modules/categories/category.dto.js';
 import type { BookCollectionDto } from '../../src/modules/collections/collection.dto.js';
 import type { PhysicalCopyDto } from '../../src/modules/copies/copy.dto.js';
+import type {
+  ActivityDto,
+  DashboardSummaryDto,
+  ReadingStatisticsDto,
+} from '../../src/modules/dashboard/dashboard.dto.js';
 import type { CopyLoanOverviewDto, LoanDto } from '../../src/modules/loans/loan.dto.js';
 import type { StorageLocationDto } from '../../src/modules/locations/location.dto.js';
 import type { NoteDto } from '../../src/modules/notes/note.dto.js';
@@ -138,6 +143,18 @@ export function loansApiFor(app: Express, accessToken: string) {
   };
 }
 
+export function dashboardApiFor(app: Express, accessToken: string) {
+  const authorized = authorizedWith(accessToken);
+  return {
+    summary: (query: Record<string, string> | string = {}) =>
+      authorized(request(app).get('/api/v1/dashboard/summary')).query(query),
+    readingStatistics: (query: Record<string, string> | string = {}) =>
+      authorized(request(app).get('/api/v1/dashboard/reading-statistics')).query(query),
+    recentActivity: (query: Record<string, string> | string = {}) =>
+      authorized(request(app).get('/api/v1/dashboard/recent-activity')).query(query),
+  };
+}
+
 export function wishlistApiFor(app: Express, accessToken: string) {
   const authorized = authorizedWith(accessToken);
   return {
@@ -167,6 +184,7 @@ export async function signInLibraryReader(app: Express) {
     collections: groupsApiFor(app, tokens.accessToken, 'collections'),
     wishlist: wishlistApiFor(app, tokens.accessToken),
     loans: loansApiFor(app, tokens.accessToken),
+    dashboard: dashboardApiFor(app, tokens.accessToken),
     presets: () =>
       authorizedWith(tokens.accessToken)(request(app).get('/api/v1/categories/presets')),
     organizationOf: (bookId: string) =>
@@ -197,6 +215,10 @@ export const groupFrom = (res: { body: unknown }) => dataFrom<GroupDto>(res);
 export const groupsFrom = (res: { body: unknown }) => dataFrom<GroupDto[]>(res);
 export const booksFrom = (res: { body: unknown }) => dataFrom<BookDto[]>(res);
 export const organizationFrom = (res: { body: unknown }) => dataFrom<BookOrganizationDto>(res);
+export const summaryFrom = (res: { body: unknown }) => dataFrom<DashboardSummaryDto>(res);
+export const readingStatisticsFrom = (res: { body: unknown }) =>
+  dataFrom<ReadingStatisticsDto>(res);
+export const activitiesFrom = (res: { body: unknown }) => dataFrom<ActivityDto[]>(res);
 export const loanFrom = (res: { body: unknown }) => dataFrom<LoanDto>(res);
 export const loansFrom = (res: { body: unknown }) => dataFrom<LoanDto[]>(res);
 export const loanOverviewFrom = (res: { body: unknown }) => dataFrom<CopyLoanOverviewDto>(res);
