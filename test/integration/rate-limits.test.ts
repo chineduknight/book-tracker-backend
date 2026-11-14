@@ -85,6 +85,33 @@ describe('authentication throttling', () => {
     expect(statuses).toEqual([401, 401, 401, 429]);
   });
 
+  /*
+   * `trust proxy` is off until a hosting network is defined (PR #14), so the limiters key on the
+   * socket address. A client must not be able to escape its bucket by inventing forwarded-for
+   * addresses.
+   */
+  it('ignores spoofed X-Forwarded-For addresses when counting failed logins', async () => {
+    const app = createAuthTestApp({
+      authRateLimits: {
+        ...UNLIMITED_AUTH_RATE_LIMITS,
+        failedLoginsPerIp: { limit: 3, windowMs: WINDOW_MS },
+      },
+    });
+
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .set('X-Forwarded-For', `203.0.113.${attempt + 1}`)
+        .set('Forwarded', `for=198.51.100.${attempt + 1}`)
+        .set('X-Real-IP', `192.0.2.${attempt + 1}`)
+        .send({ email: newRegistration().email, password: disposablePassword() });
+      statuses.push(res.status);
+    }
+
+    expect(statuses).toEqual([401, 401, 401, 429]);
+  });
+
   it('limits registrations per source address', async () => {
     const app = createAuthTestApp({
       authRateLimits: {

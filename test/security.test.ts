@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createLogger } from '../src/config/logger.js';
 import { ALLOWED_ORIGIN, createLogCapture, createTestApp } from './helpers.js';
 
@@ -103,5 +103,39 @@ describe('request logging', () => {
     expect(logs.output()).not.toContain('pw-secret');
     expect(logs.output()).not.toContain('x-secret');
     expect(logs.output()).toContain('[REDACTED]');
+  });
+});
+
+describe('rate limiter diagnostics', () => {
+  /*
+   * Without `trust proxy`, express-rate-limit warns once per limiter when X-Forwarded-For is set.
+   * The warning must go through the safe logger (name and code), not to the console with a stack.
+   */
+  it('reports a forwarded-for warning through the safe logger, never the console', async () => {
+    const consoleError = vi.spyOn(console, 'error');
+    const consoleWarn = vi.spyOn(console, 'warn');
+    const { stream, output } = createLogCapture();
+    const app = createTestApp({ logger: createLogger('info', stream) });
+
+    const res = await request(app)
+      .post('/api/v1/auth/register')
+      .set('X-Forwarded-For', '203.0.113.9')
+      .send({ name: 'Rate Limit Probe' });
+
+    expect(res.status).toBe(400);
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(consoleWarn).not.toHaveBeenCalled();
+    const entries = output()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(entries).toContainEqual(
+      expect.objectContaining({
+        msg: 'Rate limiter reported a problem',
+        err: { name: 'ValidationError', code: 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR' },
+      }),
+    );
+    expect(output()).not.toContain('203.0.113.9');
+    expect(output()).not.toContain('node_modules');
   });
 });

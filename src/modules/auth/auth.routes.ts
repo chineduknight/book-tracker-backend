@@ -1,4 +1,5 @@
 import { Router, type RequestHandler } from 'express';
+import type { Logger } from '../../config/logger.js';
 import { parseRequestBody } from '../../shared/request-validation.js';
 import { findUserById } from '../users/user.service.js';
 import type { AccessTokenService } from './access-token.js';
@@ -7,8 +8,7 @@ import type {
   CurrentUserResponseBody,
   RefreshedSessionResponseBody,
 } from './auth.dto.js';
-import { unauthenticatedError } from './auth.errors.js';
-import { authenticatedUserOf } from './auth.middleware.js';
+import { authenticatedUserOf, rejectAsUnauthenticated } from './auth.middleware.js';
 import { createAuthRateLimiters, type AuthRateLimits } from './auth.rate-limits.js';
 import {
   loginRequestSchema,
@@ -21,15 +21,17 @@ export interface AuthRouterDependencies {
   accessTokens: AccessTokenService;
   requireAuthenticatedUser: RequestHandler;
   rateLimits: AuthRateLimits;
+  logger: Logger;
 }
 
 export function createAuthRouter({
   accessTokens,
   requireAuthenticatedUser,
   rateLimits,
+  logger,
 }: AuthRouterDependencies): Router {
   const authService = createAuthService(accessTokens);
-  const limiters = createAuthRateLimiters(rateLimits);
+  const limiters = createAuthRateLimiters(rateLimits, logger);
   const authRouter = Router();
 
   authRouter.post(
@@ -70,7 +72,7 @@ export function createAuthRouter({
   authRouter.get('/me', requireAuthenticatedUser, async (req, res) => {
     const { userId } = authenticatedUserOf(req);
     const user = await findUserById(userId);
-    if (!user) throw unauthenticatedError();
+    if (!user) rejectAsUnauthenticated(res);
     res.status(200).json({ data: { user } } satisfies CurrentUserResponseBody);
   });
 

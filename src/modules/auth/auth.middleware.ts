@@ -1,4 +1,4 @@
-import type { Request, RequestHandler } from 'express';
+import type { Request, RequestHandler, Response } from 'express';
 import type { AccessTokenService } from './access-token.js';
 import { unauthenticatedError } from './auth.errors.js';
 import { isSessionActive, type SessionReference } from './session.service.js';
@@ -16,14 +16,17 @@ function bearerTokenFrom(req: Request): string | null {
   return BEARER_CREDENTIALS.exec(authorization)?.[1] ?? null;
 }
 
+/** Every `401 UNAUTHENTICATED` carries the Bearer challenge, wherever the request is refused. */
+export function rejectAsUnauthenticated(res: Response): never {
+  res.set('WWW-Authenticate', 'Bearer');
+  throw unauthenticatedError();
+}
+
 export function createAuthenticationMiddleware(accessTokens: AccessTokenService): RequestHandler {
   return async function requireAuthenticatedUser(req, res, next) {
     const accessToken = bearerTokenFrom(req);
     const claims = accessToken ? await accessTokens.verifyAccessToken(accessToken) : null;
-    if (!claims || !(await isSessionActive(claims))) {
-      res.set('WWW-Authenticate', 'Bearer');
-      throw unauthenticatedError();
-    }
+    if (!claims || !(await isSessionActive(claims))) rejectAsUnauthenticated(res);
     authenticatedUsers.set(req, claims);
     next();
   };
