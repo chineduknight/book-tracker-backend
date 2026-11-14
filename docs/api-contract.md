@@ -7,7 +7,7 @@ This document defines shared HTTP behavior. Every implemented endpoint must addi
 - Base path: `/api/v1`.
 - JSON responses use `Content-Type: application/json`; `204 No Content` has no body.
 - All responses include an `X-Request-Id` header. Error responses also include `requestId` in the body if one was assigned.
-- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories`, `/api/v1/collections` and `/api/v1/wishlist` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
+- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories`, `/api/v1/collections`, `/api/v1/wishlist` and `/api/v1/loans` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
 - CORS exposes `X-Request-Id` and `Location` to allowed browser origins.
 - **Logging:** request logs contain the method, the URL path (which includes resource ids such as `/api/v1/books/{id}`), the status and the request id. Query strings, headers and bodies are never logged, so titles, search terms, location names, notes, emails, passwords and tokens never reach the logs.
 - Public IDs are strings named `id`, not MongoDB `_id`; never return `__v` or internal model fields.
@@ -79,18 +79,18 @@ Every error uses the established envelope:
 
 `details` is optional, contains only safe field-level feedback, and must not expose credentials, database messages, or input secrets. Known error bodies use a safe, stable `code` and human-readable `message`.
 
-| Status                       | Intended use                                                                    | Example code                                                                                                                                                                                                              |
-| ---------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                                                                                                                                                                        |
-| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN`                                                                                                                                                         |
-| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                                                                                                                                                                               |
-| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                                                                                                                                                                               |
-| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`, `READING_SESSION_IN_PROGRESS`, `INVALID_READING_TRANSITION`, `READING_SESSION_UPDATE_CONFLICT`, `READING_SESSION_BOOK_MISMATCH`, `WISHLIST_ALREADY_ACQUIRED` |
-| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                                                                                                                                                                                       |
-| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                                                                                                                                                                                  |
-| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                                                                                                                                                                            |
-| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                                                                                                                                                                          |
-| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                                                                                                                                                                                     |
+| Status                       | Intended use                                                                    | Example code                                                                                                                                                                                                                                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `400 Bad Request`            | Validation errors, malformed JSON, invalid query/params                         | `VALIDATION_ERROR`, `INVALID_JSON`                                                                                                                                                                                                                                                                 |
+| `401 Unauthorized`           | Missing, invalid, or expired authentication; failed login or refresh            | `UNAUTHENTICATED`, `INVALID_CREDENTIALS`, `INVALID_REFRESH_TOKEN`                                                                                                                                                                                                                                  |
+| `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                                                                                                                                                                                                                                                        |
+| `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                                                                                                                                                                                                                                                        |
+| `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`, `READING_SESSION_IN_PROGRESS`, `INVALID_READING_TRANSITION`, `READING_SESSION_UPDATE_CONFLICT`, `READING_SESSION_BOOK_MISMATCH`, `WISHLIST_ALREADY_ACQUIRED`, `COPY_ALREADY_ON_LOAN`, `LOAN_ALREADY_RETURNED`, `LOAN_UPDATE_CONFLICT` |
+| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                                                                                                                                                                                                                                                                |
+| `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                                                                                                                                                                                                                                                           |
+| `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                                                                                                                                                                                                                                                     |
+| `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                                                                                                                                                                                                                                                   |
+| `503 Service Unavailable`    | Not ready, including disconnected database                                      | `SERVICE_UNAVAILABLE`                                                                                                                                                                                                                                                                              |
 
 Do not change existing implemented error codes merely to match these suggested names; preserve current behavior or propose an explicit breaking-change decision. Avoid `200` responses that represent errors inside `data`.
 
@@ -337,7 +337,7 @@ interface PhysicalCopyDto {
 - **Listing:** newest first, `id` as tie-breaker. `page` ≥ 1 (default 1), `limit` 1–100 (default 20), optional `locationId` and `condition` filters (applied to `total` too); each parameter at most once, others rejected. Filtering for unassigned copies is not supported yet.
 - **Visibility:** a copy is visible only while it and its parent book are both active. Copies of a deleted book return `404 "Copy not found"` from get, update and delete, and listing a deleted book's copies returns `404 "Book not found"`.
 - **Deletion is soft:** `DELETE` marks the copy deleted and returns `204`; it then behaves as missing everywhere, and a repeated delete returns `404`. The record is kept for future lending history.
-- **No lending status:** there is no `isAvailable` or `isOnLoan`; availability will be derived from active loans.
+- **No stored lending status:** the copy DTO has no `isAvailable` or `isOnLoan`; availability is derived from active loans by `GET /copies/:copyId/loan-overview` (see [Loans](#loans)).
 
 ### Reading sessions
 
@@ -524,7 +524,7 @@ Memberships are never part of a group DTO; a group's books are read through its 
 | `GET`    | `/api/v1/{kind}/:id/books`                   | Query: `page`, `limit`                                 | `200` `{ "data": BookDto[], "meta": { "pagination" } }`                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                                                  |
 | `GET`    | `/api/v1/books/:bookId/organization`         | —                                                      | `200` `{ "data": BookOrganizationDto }`                                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found"                                                 |
 
-`{kind}` is `categories` (route parameter `categoryId`) or `collections` (`collectionId`). Responses under `/api/v1/categories`, `/api/v1/collections` and `/api/v1/wishlist` send `Cache-Control: no-store`, like the other private paths; the organization endpoint inherits the `/api/v1/books` rule.
+`{kind}` is `categories` (route parameter `categoryId`) or `collections` (`collectionId`). Responses under `/api/v1/categories`, `/api/v1/collections`, `/api/v1/wishlist` and `/api/v1/loans` send `Cache-Control: no-store`, like the other private paths; the organization endpoint inherits the `/api/v1/books` rule.
 
 - **Presets** are a fixed, read-only suggestion list in a deterministic order: `Fiction`, `Nonfiction`, `Biography`, `History`, `Philosophy`, `Psychology`, `Science`, `Technology`, `Religion`, `Personal Development`. They are never stored and never depend on the account: registering creates no categories, listing creates none, and a reader who created or deleted `Philosophy` still sees it suggested. A reader materializes a category only with `POST /categories`, with any name, preset or not.
 - **Fields (strict; `ownerId`, `normalizedName`, `bookIds`, `deletedAt`, `id` and any other field are rejected as `Unknown field`):** `name` is trimmed with inner whitespace collapsed, 1–100 characters, and cannot be `null`; `description` is trimmed, 1–500 characters, and on PATCH `null` clears it. Blank strings are rejected.
@@ -604,6 +604,73 @@ Responses under `/api/v1/wishlist` send `Cache-Control: no-store`, like the othe
 | `sort`          | `recent` (default, newest first), `oldest`, `title_asc`, `title_desc` (by the case-insensitive title) or `priority` (high first, newest within a priority); ties always broken by `id` in the same direction                                             |
 
 Totals reflect all filters before paging; an empty result is `data: []` with `{ "page": 1, "limit": 20, "total": 0, "totalPages": 0 }`. Request logs hold only method, path (with ids), status and request id; titles, authors, notes, URLs and query strings are never logged, and validation errors never echo submitted text.
+
+### Loans
+
+A loan is **one lending event of one physical copy** to a borrower. A copy has at most one active loan at a time (enforced by a unique database index); returning the copy frees it for a **new** loan while the earlier loan stays as history. Several copies of the same book may be out at once. Ebooks have no copies and cannot be lent. Availability is **derived** from the active loan and never stored on the copy or book. There is deliberately **no loan deletion** and no reopening. Every endpoint requires a bearer access token. DTOs: `src/modules/loans/loan.dto.ts`. Bruno: `bruno/Loans/`.
+
+```ts
+interface LoanDto {
+  id: string; // 24-character lowercase hex
+  copyId: string; // immutable; may refer to a copy that was deleted later
+  bookId: string; // immutable; the copy's book when the loan was created
+  borrowerName: string;
+  borrowerContact?: string; // free text, omitted when unset
+  lentOn: string; // YYYY-MM-DD, kept as written
+  dueOn?: string; // YYYY-MM-DD, omitted when unset
+  returnedOn: string | null; // always present; null while the loan is active
+  note?: string; // omitted when unset
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC
+}
+
+interface CopyLoanOverviewDto {
+  copyId: string;
+  isOnLoan: boolean; // derived from the active loan, never persisted
+  activeLoan: LoanDto | null;
+}
+```
+
+| Method  | Path                                   | Request                               | Success                                                     | Errors                                                                                                  |
+| ------- | -------------------------------------- | ------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `POST`  | `/api/v1/copies/:copyId/loans`         | Loan fields                           | `201` `{ "data": LoanDto }`, `Location: /api/v1/loans/{id}` | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Copy not found", `409 COPY_ALREADY_ON_LOAN`             |
+| `GET`   | `/api/v1/copies/:copyId/loans`         | Loan query                            | `200` `{ "data": LoanDto[], "meta": { "pagination" } }`     | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Copy not found"                                         |
+| `GET`   | `/api/v1/copies/:copyId/loan-overview` | —                                     | `200` `{ "data": CopyLoanOverviewDto }`                     | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Copy not found"                                         |
+| `GET`   | `/api/v1/loans`                        | Loan query                            | `200` `{ "data": LoanDto[], "meta": { "pagination" } }`     | `400 VALIDATION_ERROR`, `401`                                                                           |
+| `GET`   | `/api/v1/loans/:loanId`                | —                                     | `200` `{ "data": LoanDto }`                                 | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Loan not found"                                         |
+| `PATCH` | `/api/v1/loans/:loanId`                | Fields to correct, at least one       | `200` `{ "data": LoanDto }`                                 | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`, `409 LOAN_UPDATE_CONFLICT`                              |
+| `PUT`   | `/api/v1/loans/:loanId/return`         | `{ "returnedOn": "YYYY-MM-DD" }` only | `200` `{ "data": LoanDto }`                                 | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`, `409 LOAN_ALREADY_RETURNED`, `409 LOAN_UPDATE_CONFLICT` |
+
+`DELETE /api/v1/loans/:loanId` does not exist (`404 "Route not found"`). Responses under `/api/v1/loans` and `/api/v1/copies` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight.
+
+**Fields (strict; `returnedOn` on create, `copyId`, `bookId`, `ownerId`, `status`, `revision`, `id` and any other field are rejected as `Unknown field`):**
+
+| Field             | Rules                                                                                                    |
+| ----------------- | -------------------------------------------------------------------------------------------------------- |
+| `borrowerName`    | required; trimmed, 1–160 characters; cannot be `null`                                                    |
+| `borrowerContact` | trimmed, 1–200 characters of free text (phone, email, anything); on PATCH `null` clears it               |
+| `lentOn`          | required; an existing calendar date `YYYY-MM-DD` (past or future), kept as written; cannot be `null`     |
+| `dueOn`           | existing calendar date on or after `lentOn`; on PATCH `null` clears it                                   |
+| `note`            | trimmed, 1–2,000 characters; on PATCH `null` clears it                                                   |
+| `returnedOn`      | never on create; set by the return endpoint; on PATCH only a non-null date correction on a returned loan |
+
+- **Dates are calendar days** with no time zone applied and are never filled in automatically: lending and returning need explicit dates. Chronology is validated on the **merged** result of every write: `dueOn` and `returnedOn` must be on or after `lentOn` (detail `{ "field": "dueOn" | "returnedOn", "message": "must be on or after lentOn" }`). Returning after the due date is fine; a passed due date never implies a return.
+- **Create** requires a **visible** copy: one of the reader's active physical copies whose book is active. A missing, foreign or deleted copy, a copy of a deleted book, or an ebook id all return `404 "Copy not found"`. The loan stores the copy's current `bookId`; the client never supplies it. A copy with an active loan returns `409 { "error": { "code": "COPY_ALREADY_ON_LOAN", "message": "This copy already has an active loan", "requestId": "<id>" } }`; the unique index decides concurrent attempts, so creating is **not** idempotent and a retry after success gets `409` until the loan is returned.
+- **Return** (`PUT .../return`) accepts exactly `returnedOn`. The first valid return records the date and frees the copy. Repeating with the **same** date is idempotent (`200`, same `updatedAt`, nothing written); a **different** date returns `409 { "error": { "code": "LOAN_ALREADY_RETURNED", "message": "This loan was already returned on a different date; correct the date with PATCH", "requestId": "<id>" } }`. Concurrent returns settle on exactly one date.
+- **PATCH** corrects `borrowerName`, `borrowerContact`, `lentOn`, `dueOn` and `note` on active and returned loans, and `returnedOn` only on a returned loan (`400` with `{ "field": "returnedOn", "message": "can only be corrected on a returned loan; record the return first" }` otherwise). `returnedOn: null` is rejected: a returned loan can never become active again. Each PATCH writes only the fields it names, so concurrent edits of different fields both persist; for the same field the last write wins. Edits are compare-and-set on an internal revision: a concurrent change makes the request re-read and re-validate, and after five failed attempts it returns `409 LOAN_UPDATE_CONFLICT` and may be retried.
+- **Overview** (`GET /copies/:copyId/loan-overview`) requires a visible copy and reports `{ "copyId", "isOnLoan": false, "activeLoan": null }` or the active `LoanDto`.
+- **Visibility and deletion:** a missing loan and another reader's loan both return `404 "Loan not found"`. Loans are **never hidden by the deletion of their copy or book**: `GET /loans`, `GET /loans/:loanId`, PATCH and return keep working, because an outstanding borrower obligation must not vanish. This is a deliberate exception to the policy for copies, reading sessions and notes. The **copy-scoped** endpoints (`/copies/:copyId/loans`, `/copies/:copyId/loan-overview`, creating a loan) require a currently visible copy and return `404 "Copy not found"` once the copy or its book is deleted. Deleting a copy or book never changes loans; the recorded `copyId` and `bookId` stay for history, and clients should not assume they resolve to visible records.
+
+**Loan query** (both list endpoints; each parameter at most once; unknown parameters rejected):
+
+| Parameter       | Rules                                                                                                                                       |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page`, `limit` | `page` ≥ 1 (default 1), `limit` 1–100 (default 20)                                                                                          |
+| `status`        | `active` (default): `returnedOn` is null; `returned`: returned loans; `overdue`: active loans with a `dueOn` **before** `asOf`; `all`: both |
+| `sort`          | `recent` (default) or `oldest`, by creation time with `id` as tie-breaker in the same direction; never by borrower or lending date          |
+| `asOf`          | existing calendar date; **only** with `status=overdue` (otherwise `400` naming `asOf`); defaults to the current **UTC** calendar day        |
+
+A loan due on the reference day is not yet overdue; a loan without a due date or already returned is never overdue. Totals reflect the filter before paging; an empty result is `data: []` with `totalPages: 0`. Request logs hold only method, path (with ids), status and request id; borrower details, dates, notes and query strings are never logged, and validation errors never echo submitted text.
 
 ### Responses on any path
 

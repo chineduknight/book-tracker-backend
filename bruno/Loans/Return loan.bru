@@ -1,0 +1,41 @@
+meta {
+  name: Return loan
+  type: http
+  seq: 17
+}
+
+put {
+  url: {{baseUrl}}/loans/{{loansLoanId}}/return
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "returnedOn": "2026-11-12"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) bru.setVar("loansReturnedUpdatedAt", res.getBody().data.updatedAt);
+}
+
+tests {
+  test("records the return", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.returnedOn).to.equal("2026-11-12");
+  });
+}
+
+docs {
+  # PUT /api/v1/loans/:loanId/return
+
+  Body: exactly `{ "returnedOn": "YYYY-MM-DD" }`, on or after `lentOn`. The first valid return
+  frees the copy; repeating with the same date is idempotent and writes nothing; a different date
+  returns `409 LOAN_ALREADY_RETURNED` (correct the date with PATCH). Works after the copy or
+  book was deleted.
+}

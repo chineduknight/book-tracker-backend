@@ -1,0 +1,29 @@
+meta {
+  name: List loans with misplaced asOf
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/loans?status=all&asOf=2026-11-11
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: all
+  asOf: 2026-11-11
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+tests {
+  test("rejects asOf outside the overdue status", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([
+      { field: "asOf", message: "is only accepted together with status=overdue" },
+    ]);
+  });
+}

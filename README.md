@@ -11,8 +11,9 @@ lending history. Ebooks can be catalogued without storing any files.
 
 The API currently covers accounts and sessions, the private book catalogue, storage locations and
 physical copies, reading sessions with rereads, notes and highlights with owner-scoped text
-search, categories and collections for organizing the catalogue, and a wishlist of books to
-obtain. Lending and data export are still to come (see [Upcoming PRs](#upcoming-prs)).
+search, categories and collections for organizing the catalogue, a wishlist of books to obtain,
+and lending of physical copies with full history. Data export is still to come (see
+[Upcoming PRs](#upcoming-prs)).
 
 ## Stack
 
@@ -156,6 +157,13 @@ preflight and request-body errors.
 | PATCH                         | `/api/v1/wishlist/:wishlistItemId`             | Edit descriptive fields; `null` clears                                 |
 | PUT                           | `/api/v1/wishlist/:wishlistItemId/acquisition` | Link an owned book and mark the wish acquired (idempotent)             |
 | DELETE                        | `/api/v1/wishlist/:wishlistItemId`             | Soft-delete a wishlist item (204)                                      |
+| POST                          | `/api/v1/copies/:copyId/loans`                 | Lend a physical copy; one active loan per copy (201 + `Location`)      |
+| GET                           | `/api/v1/copies/:copyId/loans`                 | One copy's lending history (paginated)                                 |
+| GET                           | `/api/v1/copies/:copyId/loan-overview`         | Derived availability and the active loan                               |
+| GET                           | `/api/v1/loans`                                | All loans: active (default), returned, overdue or all (paginated)      |
+| GET                           | `/api/v1/loans/:loanId`                        | One loan, also after its copy or book was deleted                      |
+| PATCH                         | `/api/v1/loans/:loanId`                        | Correct borrower details and dates; never reopens                      |
+| PUT                           | `/api/v1/loans/:loanId/return`                 | Record the return (idempotent for the same date)                       |
 
 Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
 token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
@@ -185,6 +193,7 @@ src/
 ├── modules/collections/   # reader-curated collections, mirroring categories
 ├── modules/organization/  # one book's categories and collections (reverse lookup)
 ├── modules/wishlist/      # wanted books, priorities, search and acquisition links to owned books
+├── modules/loans/         # lending of physical copies: one active loan per copy, full history
 ├── modules/health/        # liveness and readiness routes + response DTOs
 ├── modules/users/         # user model, public UserDto, user service
 └── shared/                # AppError, response envelopes, request validation, safe errors
@@ -224,14 +233,14 @@ storage locations and physical copies, reading sessions with rereads and a deriv
 overview, notes and highlights (Markdown source, optional session link, owner-scoped text search,
 soft delete), categories and collections (opt-in presets, per-reader unique names, idempotent
 ordered memberships, soft delete), a wishlist (priorities, search, explicit acquisition linking an
-owned book, soft delete), tests, CI, Bruno.
+owned book, soft delete), lending (one active loan per copy enforced by the database, returns,
+overdue view, history that survives copy deletion), tests, CI, Bruno.
 
-Not included yet: email verification, password reset, OAuth, loans, export, wish un-acquire,
+Not included yet: email verification, password reset, OAuth, export, loan reminders, wish un-acquire,
 nested categories,
 membership reordering, automatic classification, book or note restore, location deletion,
 reading-session deletion, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Loans**: lending history with one active loan per copy (partial unique index + race tests).
-2. **Export**: full per-user data export.
+1. **Export**: full per-user data export.

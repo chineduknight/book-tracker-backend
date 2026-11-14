@@ -1,0 +1,28 @@
+meta {
+  name: Correct return date
+  type: http
+  seq: 20
+}
+
+patch {
+  url: {{baseUrl}}/loans/{{loansLoanId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "returnedOn": "2026-11-13"
+  }
+}
+
+tests {
+  test("corrects the return date without reopening the loan", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.returnedOn).to.equal("2026-11-13");
+  });
+}

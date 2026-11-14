@@ -1,0 +1,33 @@
+meta {
+  name: List active loans
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/loans
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+tests {
+  test("lists active loans newest first", function () {
+    expect(res.getStatus()).to.equal(200);
+    const ids = res.getBody().data.map((loan) => loan.id);
+    expect(ids).to.eql([bru.getVar("loansSecondLoanId"), bru.getVar("loansLoanId")]);
+    expect(res.getBody().meta.pagination).to.eql({ page: 1, limit: 20, total: 2, totalPages: 1 });
+  });
+}
+
+docs {
+  # GET /api/v1/loans
+
+  Query (each at most once): `page`, `limit` (1–100), `status` (`active` default | `returned` |
+  `overdue` | `all`), `sort` (`recent` default | `oldest`, by creation time then id) and `asOf`
+  (`YYYY-MM-DD`, only with `status=overdue`; defaults to the current UTC calendar day). Loans of
+  deleted copies or books stay listed: an outstanding obligation never disappears.
+}

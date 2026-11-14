@@ -190,6 +190,37 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 - Future export and statistics should treat wishes as a separate section from the owned
   catalogue; an acquired wish refers to a book by id but is not a book.
 
+## Loans
+
+- `modules/loans` owns the `loans` collection and serves `/copies/:copyId/loans`,
+  `/copies/:copyId/loan-overview` and `/loans` from one router, mounted before the copies router.
+  Its only dependency is the copies service's `requireVisibleCopyBookIdOwnedByUser`, which applies
+  the existing owner, soft-deletion and parent-book checks and yields the copy's book id; the loans
+  module never reads the copies or books collections, and copies never depend on loans.
+- **Exactly one active loan per copy** is a database fact: the partial unique index
+  `owner_copy_single_active` on `{ ownerId, copyId }` where `returnedOn: null`. Active loans are
+  always stored with an explicit `returnedOn: null` (schema default); because the partial filter
+  also matches a missing field, a direct insert that omits `returnedOn` is still constrained
+  (tested). A duplicate-key error becomes `409 COPY_ALREADY_ON_LOAN`.
+- **Availability is derived**, never stored: the overview runs one indexed lookup for the active
+  loan of a copy. Copies and books have no lending fields.
+- **Edits are compare-and-set on an internal `revision`**, as in reading sessions: read the loan,
+  validate the merged chronology, write only if the revision is unchanged, retry up to five times,
+  then `409 LOAN_UPDATE_CONFLICT`. The return endpoint additionally matches `returnedOn: null`, so
+  concurrent returns produce one date and a return can never race a `lentOn` correction into an
+  impossible chronology.
+- **Loans are not hidden by copy or book deletion.** The global list, single-loan read, PATCH and
+  return are scoped only by `ownerId`; copy-scoped routes go through the copies service and
+  therefore require a visible copy. This is the one module where history of a deleted parent stays
+  visible, because it records an obligation someone else still owes the reader.
+- Indexes, all led by `ownerId`: `owner_copy_single_active` (unique, partial), `owner_copy_recent`
+  `{ ownerId, copyId, createdAt: -1, _id: -1 }`, `owner_recent` `{ ownerId, createdAt: -1, _id: -1 }`
+  and `owner_returned_recent` `{ ownerId, returnedOn, createdAt: -1, _id: -1 }`. The planner serves
+  the active list from either `owner_returned_recent` or `owner_recent`, and the returned and overdue
+  shapes from an owner-scoped index with an in-memory sort on small result sets; the tests assert
+  an owner-scoped index and no collection scan rather than one fixed plan. No due-date index is
+  added until measurements justify it.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
@@ -200,11 +231,10 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 - Unhandled rejections and uncaught exceptions are logged as `fatal` and exit with code 1. Like all
   logged errors, they are reduced to name and code (see [decisions.md](decisions.md)).
 
-## Future data model (design notes, not implemented)
+## Data model overview
 
 `User`, `Session`, `RefreshToken`, `Book`, `StorageLocation`, `PhysicalCopy`, `ReadingSession`,
-`Note`, `Category`, `BookCollection` and `WishlistItem` exist (see above); `Loan` is still a
-design note.
+`Note`, `Category`, `BookCollection`, `WishlistItem` and `Loan` exist (see above).
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)
@@ -217,5 +247,5 @@ User 1─* WishlistItem ─?→ Book            (independent until acquired; the
 
 - Every collection carries `ownerId`, and indexes lead with it (for example
   `{ ownerId: 1, bookId: 1 }`).
-- `Loan`: partial unique index on `{ copyId: 1 }` where `returnedAt` is null.
+- `Loan`: partial unique index on `{ ownerId: 1, copyId: 1 }` where `returnedOn` is null.
 - `Book.format` distinguishes physical books from ebook catalogue entries; there is no file reference.

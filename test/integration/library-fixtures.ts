@@ -6,6 +6,7 @@ import type { BookDto } from '../../src/modules/books/book.dto.js';
 import type { CategoryDto } from '../../src/modules/categories/category.dto.js';
 import type { BookCollectionDto } from '../../src/modules/collections/collection.dto.js';
 import type { PhysicalCopyDto } from '../../src/modules/copies/copy.dto.js';
+import type { CopyLoanOverviewDto, LoanDto } from '../../src/modules/loans/loan.dto.js';
 import type { StorageLocationDto } from '../../src/modules/locations/location.dto.js';
 import type { NoteDto } from '../../src/modules/notes/note.dto.js';
 import type { BookOrganizationDto } from '../../src/modules/organization/organization.dto.js';
@@ -118,6 +119,25 @@ export function groupsApiFor(app: Express, accessToken: string, rootPath: string
 
 export type GroupsApi = ReturnType<typeof groupsApiFor>;
 
+export function loansApiFor(app: Express, accessToken: string) {
+  const authorized = authorizedWith(accessToken);
+  return {
+    create: (copyId: string, loan: object) =>
+      authorized(request(app).post(`/api/v1/copies/${copyId}/loans`)).send(loan),
+    listForCopy: (copyId: string, query: Record<string, string> | string = {}) =>
+      authorized(request(app).get(`/api/v1/copies/${copyId}/loans`)).query(query),
+    overview: (copyId: string) =>
+      authorized(request(app).get(`/api/v1/copies/${copyId}/loan-overview`)),
+    listAll: (query: Record<string, string> | string = {}) =>
+      authorized(request(app).get('/api/v1/loans')).query(query),
+    get: (loanId: string) => authorized(request(app).get(`/api/v1/loans/${loanId}`)),
+    update: (loanId: string, changes: object) =>
+      authorized(request(app).patch(`/api/v1/loans/${loanId}`)).send(changes),
+    return: (loanId: string, loanReturn: object) =>
+      authorized(request(app).put(`/api/v1/loans/${loanId}/return`)).send(loanReturn),
+  };
+}
+
 export function wishlistApiFor(app: Express, accessToken: string) {
   const authorized = authorizedWith(accessToken);
   return {
@@ -146,6 +166,7 @@ export async function signInLibraryReader(app: Express) {
     categories: groupsApiFor(app, tokens.accessToken, 'categories'),
     collections: groupsApiFor(app, tokens.accessToken, 'collections'),
     wishlist: wishlistApiFor(app, tokens.accessToken),
+    loans: loansApiFor(app, tokens.accessToken),
     presets: () =>
       authorizedWith(tokens.accessToken)(request(app).get('/api/v1/categories/presets')),
     organizationOf: (bookId: string) =>
@@ -176,6 +197,9 @@ export const groupFrom = (res: { body: unknown }) => dataFrom<GroupDto>(res);
 export const groupsFrom = (res: { body: unknown }) => dataFrom<GroupDto[]>(res);
 export const booksFrom = (res: { body: unknown }) => dataFrom<BookDto[]>(res);
 export const organizationFrom = (res: { body: unknown }) => dataFrom<BookOrganizationDto>(res);
+export const loanFrom = (res: { body: unknown }) => dataFrom<LoanDto>(res);
+export const loansFrom = (res: { body: unknown }) => dataFrom<LoanDto[]>(res);
+export const loanOverviewFrom = (res: { body: unknown }) => dataFrom<CopyLoanOverviewDto>(res);
 export const wishFrom = (res: { body: unknown }) => dataFrom<WishlistItemDto>(res);
 export const wishesFrom = (res: { body: unknown }) => dataFrom<WishlistItemDto[]>(res);
 
@@ -271,4 +295,18 @@ export type GroupKind = (typeof GROUP_KINDS)[number][1];
 
 export function addWish(reader: LibraryReader, item: object = { title: 'Dune' }) {
   return expectCreated<WishlistItemDto>(reader.wishlist.create(item));
+}
+
+export const LOAN_DEFAULTS = { borrowerName: 'Ada Okafor', lentOn: '2026-11-14' };
+
+export function lendCopy(reader: LibraryReader, copyId: string, loan: object = LOAN_DEFAULTS) {
+  return expectCreated<LoanDto>(reader.loans.create(copyId, loan));
+}
+
+/** A reader with one physical book and one of its copies, the usual lending fixture. */
+export async function signInLender(app: Express) {
+  const reader = await signInLibraryReader(app);
+  const book = await addPhysicalBook(reader);
+  const copy = await addCopy(reader, book.id);
+  return { reader, book, copy };
 }

@@ -1,0 +1,22 @@
+meta {
+  name: Delete loan
+  type: http
+  seq: 27
+}
+
+delete {
+  url: {{baseUrl}}/loans/{{loansLoanId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+tests {
+  test("has no delete endpoint: loans are history", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error.message).to.equal("Route not found");
+  });
+}

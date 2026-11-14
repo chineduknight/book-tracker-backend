@@ -1,0 +1,28 @@
+meta {
+  name: Update loan with impossible dates
+  type: http
+  seq: 16
+}
+
+patch {
+  url: {{baseUrl}}/loans/{{loansLoanId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "lentOn": "2026-11-20"
+  }
+}
+
+tests {
+  test("rejects a lending date after the due date", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([{ field: "dueOn", message: "must be on or after lentOn" }]);
+  });
+}

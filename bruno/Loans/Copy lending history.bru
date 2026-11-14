@@ -1,0 +1,36 @@
+meta {
+  name: Copy lending history
+  type: http
+  seq: 23
+}
+
+get {
+  url: {{baseUrl}}/copies/{{loansCopyId}}/loans?status=all&sort=oldest
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: all
+  sort: oldest
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+tests {
+  test("lists both loans of the copy in creation order", function () {
+    expect(res.getStatus()).to.equal(200);
+    const ids = res.getBody().data.map((loan) => loan.id);
+    expect(ids).to.eql([bru.getVar("loansLoanId"), bru.getVar("loansNewLoanId")]);
+    expect(res.getBody().meta.pagination.total).to.equal(2);
+  });
+}
+
+docs {
+  # GET /api/v1/copies/:copyId/loans
+
+  One visible copy's lending history with the same query as `GET /loans`. A deleted or foreign copy
+  returns `404 "Copy not found"`; use `GET /loans` for obligations on deleted copies.
+}

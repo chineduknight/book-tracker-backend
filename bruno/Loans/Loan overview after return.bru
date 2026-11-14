@@ -1,0 +1,23 @@
+meta {
+  name: Loan overview after return
+  type: http
+  seq: 21
+}
+
+get {
+  url: {{baseUrl}}/copies/{{loansCopyId}}/loan-overview
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+tests {
+  test("reports the copy as available again", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.isOnLoan).to.equal(false);
+    expect(res.getBody().data.activeLoan).to.equal(null);
+  });
+}

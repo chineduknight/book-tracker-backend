@@ -325,3 +325,40 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
   `priorityRank` (`high` 0, `medium` 1, `low` 2) is the internal sort key written in the same
   update, so the priority sort uses a plain ascending index.
 - **Deletion is soft** and explicit, keeping the record and any acquisition history.
+
+## Lending decisions
+
+- **A loan is one lending event of one physical copy.** Books and ebooks are never lent; several
+  copies of a book can be out at once, each with its own borrower. Every event is its own record
+  and nothing overwrites an earlier loan (invariant 3 applied to lending).
+- **One active loan per copy is enforced by MongoDB** (invariant 4): the partial unique index
+  `owner_copy_single_active` on `{ ownerId, copyId }` where `returnedOn: null`. Active loans store
+  an explicit `returnedOn: null`; the partial filter also matches a missing field, so a direct
+  insert cannot bypass the rule. The duplicate-key error is reported as `409 COPY_ALREADY_ON_LOAN`.
+  Creating a loan is therefore never idempotent and there are no idempotency keys.
+- **Availability is derived, never stored.** No `isOnLoan`, `isAvailable` or `activeLoanId` on
+  copies or books; `GET /copies/:copyId/loan-overview` computes it from the active loan.
+- **Returns and corrections are explicit.** Lending and return dates are calendar days the reader
+  supplies; nothing defaults to today, and a passed due date never implies a return. The return
+  endpoint is idempotent for the same date and refuses a different one
+  (`409 LOAN_ALREADY_RETURNED`); the date is corrected with PATCH, as a completed reading session
+  is corrected. A returned loan can never become active again, and loans cannot be deleted.
+- **Overdue is relative to a calendar day.** `status=overdue` lists active loans whose `dueOn` is
+  strictly before `asOf`; when `asOf` is omitted the current **UTC** calendar day is used, not the
+  server's locale, so the answer does not depend on where the API runs. `asOf` is rejected with
+  other statuses rather than ignored.
+- **Edits use compare-and-set on a revision counter**, like reading sessions, because `lentOn`,
+  `dueOn` and `returnedOn` have cross-field rules that must hold on the merged result.
+- **Loans survive the deletion of their copy or book.** Unlike copies, reading sessions and notes,
+  a loan is an obligation owed to the reader, so hiding it when the copy is deleted would be a
+  dangerous surprise. The global list, single read, PATCH and return are scoped only by owner;
+  copy-scoped endpoints (create, copy history, overview) require a visible copy. The books
+  module's active-book join is deliberately not used here. Deleting a copy or book never changes
+  loans.
+- **Copy deletion and loan creation are separate writes.** A loan created while its copy is
+  deleted may reference a now-hidden copy; it stays visible and returnable in the global list.
+  Standalone MongoDB has no transactions, and the global visibility makes the window harmless
+  (tested).
+- **No due-date index yet.** Overdue queries read the owner's active loans through
+  `owner_returned_recent` and filter on `dueOn`; add a targeted index only when measurements
+  justify it.

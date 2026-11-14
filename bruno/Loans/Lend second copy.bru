@@ -1,0 +1,33 @@
+meta {
+  name: Lend second copy
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/copies/{{loansSecondCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Bode",
+    "lentOn": "2026-11-03"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("loansSecondLoanId", res.getBody().data.id);
+}
+
+tests {
+  test("lends another copy of the same book independently", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.returnedOn).to.equal(null);
+  });
+}

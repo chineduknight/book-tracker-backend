@@ -1,0 +1,28 @@
+meta {
+  name: Return loan with other date
+  type: http
+  seq: 19
+}
+
+put {
+  url: {{baseUrl}}/loans/{{loansLoanId}}/return
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "returnedOn": "2026-11-13"
+  }
+}
+
+tests {
+  test("returns 409 LOAN_ALREADY_RETURNED", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error.code).to.equal("LOAN_ALREADY_RETURNED");
+  });
+}

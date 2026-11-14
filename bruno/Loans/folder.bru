@@ -1,0 +1,17 @@
+meta {
+  name: Loans
+  seq: 12
+}
+
+docs {
+  # Loans
+
+  Lending one **physical copy** to a borrower. Each lending event is its own loan; a copy can
+  have only one active loan at a time (enforced by a unique database index), and returning the
+  copy frees it for a new loan while the old one stays as history. Availability is derived from
+  the active loan, never stored on the copy. There is no loan deletion.
+
+  Run the folder in order. **Register loans reader** creates its own disposable account and the
+  folder creates its own book and copies, so it is independent of every other folder.
+  Contract: `docs/api-contract.md` ("Loans").
+}
