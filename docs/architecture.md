@@ -138,6 +138,37 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   None is unique: identical notes are allowed. The integration tests assert each query shape's
   index with `explain`, and that unscoped text searches are refused.
 
+## Categories and collections
+
+- `modules/categories` owns the `categories` collection and `modules/collections` owns
+  `bookcollections` (the model is `BookCollection` to keep it apart from MongoDB collections).
+  The two modules are deliberate mirrors: same schema shape, same service functions, same routes
+  under `/categories` and `/collections`. They share only domain-neutral helpers
+  (`toCaseInsensitiveKey`, the request schemas, `toPaginationMeta`); there is no generic group
+  framework, so each module can diverge later without untangling an abstraction.
+- Membership is an ordered `bookIds` array on the group document. Adding and removing are single
+  atomic updates (`$addToSet`, `$pull`) on `{ _id, ownerId, deletedAt: null }`, so concurrent
+  changes never overwrite each other and a deleted group is never written to. Group soft deletion
+  is the same kind of update.
+- Neither module reads the books collection. Both call the books service:
+  `requireActiveBookOwnedByUser` before every membership write and
+  `listActiveBooksInMembershipOrder`, which loads the owner's active books among a group's
+  `bookIds`, keeps them in membership order (`book.membership.ts`) and pages them, so hidden
+  books are dropped before counting.
+- `modules/organization` is a narrow composition layer for `GET /books/:bookId/organization`: it
+  checks the book through the books service, then asks each group module for the active groups
+  containing it (`findCategoriesContainingBook`, `findCollectionsContainingBook`). It is mounted
+  before the books router, like the other book-scoped routers, and avoids a books → groups →
+  books import cycle.
+- Indexes on both collections:
+  - `owner_active_unique_name` `{ ownerId, normalizedName }`, **unique and partial** on
+    `deletedAt: null`: one active group per normalized name and owner; deleted groups free the name.
+  - `owner_active_alphabetical` `{ ownerId, deletedAt, normalizedName, _id }`: the list.
+  - `owner_active_books` `{ ownerId, deletedAt, bookIds }` (multikey): the groups containing a book.
+
+  The integration tests assert the index definitions and, on seeded data, that the list and
+  reverse lookup use them.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
@@ -150,14 +181,15 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 
 ## Future data model (design notes, not implemented)
 
-`User`, `Session`, `RefreshToken`, `Book`, `StorageLocation`, `PhysicalCopy`, `ReadingSession`
-and `Note` exist (see above); `Loan` is still a design note.
+`User`, `Session`, `RefreshToken`, `Book`, `StorageLocation`, `PhysicalCopy`, `ReadingSession`,
+`Note`, `Category` and `BookCollection` exist (see above); `Loan` is still a design note.
 
 ```
 User 1─* Book 1─* Copy 1─* Loan          (at most one active Loan per Copy)
           │
           ├─* ReadingSession              (one per read; rereads add sessions)
-          └─* Note                        (note or highlight; optional link to one session)
+          ├─* Note                        (note or highlight; optional link to one session)
+          └─< Category / BookCollection   (many-to-many through the group's bookIds array)
 ```
 
 - Every collection carries `ownerId`, and indexes lead with it (for example

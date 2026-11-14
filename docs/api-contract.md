@@ -7,7 +7,7 @@ This document defines shared HTTP behavior. Every implemented endpoint must addi
 - Base path: `/api/v1`.
 - JSON responses use `Content-Type: application/json`; `204 No Content` has no body.
 - All responses include an `X-Request-Id` header. Error responses also include `requestId` in the body if one was assigned.
-- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions` and `/api/v1/notes` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
+- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories` and `/api/v1/collections` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
 - CORS exposes `X-Request-Id` and `Location` to allowed browser origins.
 - **Logging:** request logs contain the method, the URL path (which includes resource ids such as `/api/v1/books/{id}`), the status and the request id. Query strings, headers and bodies are never logged, so titles, search terms, location names, notes, emails, passwords and tokens never reach the logs.
 - Public IDs are strings named `id`, not MongoDB `_id`; never return `__v` or internal model fields.
@@ -480,6 +480,61 @@ interface NoteDto {
 - **Search** (`q`) uses the owner-scoped MongoDB text index over `title`, `content`, `commentary` and `chapter`. It matches whole words (no prefixes, fuzziness or stemming), ignores case and diacritics, and returns notes containing **any** of the words. Quotes and hyphens are treated as plain text, not phrase or negation operators, and the query is never used as a regular expression.
 - `GET /notes` excludes notes of deleted books **before** counting and paging, so totals and pages are exact. Empty results return `data: []` with `total: 0` and `totalPages: 0`.
 - Request logs record only method, path (with ids), status and request id; note text, search terms and other query parameters are never logged, and validation errors never echo submitted text.
+
+### Categories and collections
+
+A **category** classifies a book by subject or type (`Philosophy`, `Fiction`); a **collection** is a reader-curated shelf or list (`To Read in 2027`, `Books for Isioma`). Both group **books** (physical or ebook catalogue entries), never copies, sessions or notes; a book may be in any number of either, and a group may be empty. The two kinds have identical behaviour and are stored separately, so a reader may have a category and a collection with the same name. Grouping never changes the book: `BookDto`, `GET /books` and the book's reading status and notes are untouched. Every endpoint requires a bearer access token. DTOs: `src/modules/categories/category.dto.ts`, `src/modules/collections/collection.dto.ts`, `src/modules/organization/organization.dto.ts`. Bruno: `bruno/Categories/`, `bruno/Collections/`.
+
+```ts
+interface CategoryDto {
+  id: string; // 24-character lowercase hex
+  name: string;
+  description?: string; // omitted when unset
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC; advances on rename, description change or membership change
+}
+
+interface BookCollectionDto {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BookOrganizationDto {
+  bookId: string;
+  categories: CategoryDto[]; // the reader's active categories containing the book, alphabetical
+  collections: BookCollectionDto[]; // likewise for collections
+}
+```
+
+Memberships are never part of a group DTO; a group's books are read through its own books endpoint, and a book's groups through the organization endpoint.
+
+| Method   | Path                                         | Request                                                | Success                                                                               | Errors                                                                                                          |
+| -------- | -------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `GET`    | `/api/v1/categories/presets`                 | —                                                      | `200` `{ "data": { "names": string[] } }`                                             | `401`                                                                                                           |
+| `POST`   | `/api/v1/categories` · `/api/v1/collections` | `{ name, description? }`                               | `201` `{ "data": CategoryDto \| BookCollectionDto }`, `Location: /api/v1/{kind}/{id}` | `400 VALIDATION_ERROR`, `401`, `409 CONFLICT`                                                                   |
+| `GET`    | `/api/v1/categories` · `/api/v1/collections` | Query: `page` (default 1), `limit` (1–100, default 20) | `200` `{ "data": [...], "meta": { "pagination" } }`                                   | `400 VALIDATION_ERROR`, `401`                                                                                   |
+| `GET`    | `/api/v1/{kind}/:id`                         | —                                                      | `200` `{ "data": ... }`                                                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                                                  |
+| `PATCH`  | `/api/v1/{kind}/:id`                         | `{ name?, description? }`, at least one                | `200` `{ "data": ... }`                                                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`, `409 CONFLICT`                                                  |
+| `DELETE` | `/api/v1/{kind}/:id`                         | —                                                      | `204`, empty body                                                                     | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                                                  |
+| `PUT`    | `/api/v1/{kind}/:id/books/:bookId`           | —                                                      | `204`, empty body (idempotent add)                                                    | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found" / "Category not found" / "Collection not found" |
+| `DELETE` | `/api/v1/{kind}/:id/books/:bookId`           | —                                                      | `204`, empty body (idempotent remove)                                                 | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` (as above)                                                       |
+| `GET`    | `/api/v1/{kind}/:id/books`                   | Query: `page`, `limit`                                 | `200` `{ "data": BookDto[], "meta": { "pagination" } }`                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                                                  |
+| `GET`    | `/api/v1/books/:bookId/organization`         | —                                                      | `200` `{ "data": BookOrganizationDto }`                                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found"                                                 |
+
+`{kind}` is `categories` (route parameter `categoryId`) or `collections` (`collectionId`). Responses under `/api/v1/categories` and `/api/v1/collections` send `Cache-Control: no-store`, like the other private paths; the organization endpoint inherits the `/api/v1/books` rule.
+
+- **Presets** are a fixed, read-only suggestion list in a deterministic order: `Fiction`, `Nonfiction`, `Biography`, `History`, `Philosophy`, `Psychology`, `Science`, `Technology`, `Religion`, `Personal Development`. They are never stored and never depend on the account: registering creates no categories, listing creates none, and a reader who created or deleted `Philosophy` still sees it suggested. A reader materializes a category only with `POST /categories`, with any name, preset or not.
+- **Fields (strict; `ownerId`, `normalizedName`, `bookIds`, `deletedAt`, `id` and any other field are rejected as `Unknown field`):** `name` is trimmed with inner whitespace collapsed, 1–100 characters, and cannot be `null`; `description` is trimmed, 1–500 characters, and on PATCH `null` clears it. Blank strings are rejected.
+- **Unique names per reader and kind:** among a reader's **active** groups of one kind, names are unique after collapsing whitespace, Unicode NFC composition and lowercasing, enforced by a partial unique database index (`deletedAt: null`), so concurrent creates and renames cannot produce duplicates. A clash returns `409 { "error": { "code": "CONFLICT", "message": "A category with this name already exists", "requestId": "<id>" } }` (or `A collection ...`), without database details. Different readers may use the same name; a case-only rename keeps the new casing; a deleted group's name may be reused by a new, empty group.
+- **Ordering:** group lists are alphabetical by the case-insensitive name (Unicode code-point order), then `id`. Only `page` and `limit` are accepted, each at most once.
+- **Memberships:** `PUT` adds the book and `DELETE` removes it, both idempotent (`204` whether or not anything changed). Both require an active group of the reader and an active book of the reader; the book is checked first, so a malformed `bookId` gives `400` naming it, a missing, deleted or foreign book gives `404 "Book not found"`, and then a missing, deleted or foreign group gives `404 "Category not found"` / `"Collection not found"`. Nothing is ever created implicitly. Membership order is the order of first addition; adding an existing member does not move it, and a book removed and later re-added goes to the end. There is no reorder endpoint.
+- **A group's books** (`GET /{kind}/:id/books`) returns `BookDto` records in membership order (not creation or title order), paged with `page` and `limit`. Deleted books are removed **before** counting and paging, so `total` and the pages reflect only visible books and have no gaps. A deleted or foreign group returns `404`.
+- **Organization** (`GET /books/:bookId/organization`) lists the reader's active categories and collections that contain the book, each alphabetical; both lists are `[]` for an unorganized book. A missing, foreign or deleted book returns `404 "Book not found"`; deleted groups never appear.
+- **Deletion is soft:** `DELETE /{kind}/:id` returns `204` with no body, after which the group and its memberships behave as missing everywhere (get, list, PATCH, delete, memberships, books list, organization) and a repeated delete returns `404`. The record is kept; no book, copy, reading session, note or loan is changed. Deleting a book hides it from every group it was in (and from totals) without changing the groups; its membership id may stay stored.
+- **Logging:** request logs record only method, path (with ids), status and request id; names, descriptions, titles and query strings are never logged, and error responses never echo submitted names.
 
 ### Responses on any path
 
