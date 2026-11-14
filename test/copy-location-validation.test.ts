@@ -156,9 +156,11 @@ describe('private data responses', () => {
     },
   );
 
-  it('lets browsers read the Location header of created resources', async () => {
+  it('lets browsers read the Location header of created resources and download filenames', async () => {
     const res = await request(createTestApp()).get('/api/v1/health').set('Origin', ALLOWED_ORIGIN);
 
-    expect(res.headers['access-control-expose-headers']).toBe('x-request-id,Location');
+    expect(res.headers['access-control-expose-headers']).toBe(
+      'x-request-id,Location,Content-Disposition',
+    );
   });
 });
