@@ -17,6 +17,7 @@ import { createLocationsRouter } from './modules/locations/location.routes.js';
 import { createNotesRouter } from './modules/notes/note.routes.js';
 import { createOrganizationRouter } from './modules/organization/organization.routes.js';
 import { createReadingRouter } from './modules/reading/reading.routes.js';
+import { createWishlistRouter } from './modules/wishlist/wishlist.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
 export const API_PREFIX = '/api/v1';
@@ -30,6 +31,7 @@ const PRIVATE_DATA_PATHS = [
   '/notes',
   '/categories',
   '/collections',
+  '/wishlist',
 ].map((path) => `${API_PREFIX}${path}`);
 export const JSON_BODY_LIMIT = '100kb';
 
@@ -84,6 +86,7 @@ export function createApp({
   api.use('/locations', createLocationsRouter({ requireAuthenticatedUser }));
   api.use('/categories', createCategoriesRouter({ requireAuthenticatedUser }));
   api.use('/collections', createCollectionsRouter({ requireAuthenticatedUser }));
+  api.use('/wishlist', createWishlistRouter({ requireAuthenticatedUser }));
   app.use(API_PREFIX, api);
 
   app.use(notFoundHandler);
