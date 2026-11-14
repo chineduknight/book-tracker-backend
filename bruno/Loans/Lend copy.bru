@@ -1,0 +1,61 @@
+meta {
+  name: Lend copy
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/copies/{{loansCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Ada Okafor",
+    "borrowerContact": "+234 800 000 0000",
+    "lentOn": "2026-11-01",
+    "dueOn": "2026-11-10",
+    "note": "Hardback, please return"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("loansLoanId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public LoanDto", function () {
+    expect(res.getStatus()).to.equal(201);
+    const loan = res.getBody().data;
+    expect(loan).to.eql({
+      id: loan.id,
+      copyId: bru.getVar("loansCopyId"),
+      bookId: bru.getVar("loansBookId"),
+      borrowerName: "Ada Okafor",
+      borrowerContact: "+234 800 000 0000",
+      lentOn: "2026-11-01",
+      dueOn: "2026-11-10",
+      returnedOn: null,
+      note: "Hardback, please return",
+      createdAt: loan.createdAt,
+      updatedAt: loan.updatedAt,
+    });
+    expect(res.getHeader("location")).to.equal(`/api/v1/loans/${loan.id}`);
+  });
+}
+
+docs {
+  # POST /api/v1/copies/:copyId/loans
+
+  Lends a visible physical copy. Required: `borrowerName` (1–160) and `lentOn` (`YYYY-MM-DD`).
+  Optional: `borrowerContact` (1–200), `dueOn` (on or after `lentOn`) and `note` (1–2,000).
+  `returnedOn`, ids and owner fields are rejected. Dates are calendar days kept as written.
+
+  **201 Created**, `Location: /api/v1/loans/{id}`. **Errors**: `400 VALIDATION_ERROR`, `401`,
+  `404 NOT_FOUND` "Copy not found", `409 COPY_ALREADY_ON_LOAN`.
+}

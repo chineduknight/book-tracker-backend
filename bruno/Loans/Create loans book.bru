@@ -1,0 +1,32 @@
+meta {
+  name: Create loans book
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "title": "The Hobbit",
+    "format": "physical"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("loansBookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the physical book to lend", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

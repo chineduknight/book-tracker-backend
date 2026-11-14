@@ -1,0 +1,37 @@
+meta {
+  name: Register loans reader
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno Loans Reader",
+    "email": "{{loansEmail}}",
+    "password": "{{loansPassword}}"
+  }
+}
+
+script:pre-request {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  bru.setVar("loansEmail", `bruno-loans-${runId}@example.test`);
+  bru.setVar("loansPassword", `disposable-${runId}`);
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("loansAccessToken", res.getBody().data.tokens.accessToken);
+  }
+}
+
+tests {
+  test("creates the disposable reader used by this folder", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

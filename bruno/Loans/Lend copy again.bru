@@ -1,0 +1,37 @@
+meta {
+  name: Lend copy again
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/copies/{{loansCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Bode",
+    "lentOn": "2026-11-02"
+  }
+}
+
+tests {
+  test("returns 409 COPY_ALREADY_ON_LOAN without borrower details", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error).to.eql({
+      code: "COPY_ALREADY_ON_LOAN",
+      message: "This copy already has an active loan",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}
+
+docs {
+  A copy has at most one active loan; the unique index decides, so repeating a create is never idempotent.
+}

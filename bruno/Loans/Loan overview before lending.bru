@@ -1,0 +1,35 @@
+meta {
+  name: Loan overview before lending
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/copies/{{loansCopyId}}/loan-overview
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+tests {
+  test("reports the copy as available", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data).to.eql({
+      copyId: bru.getVar("loansCopyId"),
+      isOnLoan: false,
+      activeLoan: null,
+    });
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # GET /api/v1/copies/:copyId/loan-overview
+
+  Derived availability of a visible copy: `isOnLoan` and the active `LoanDto`, or `false` and
+  `null`. Nothing is stored on the copy. A missing, foreign or deleted copy (or a copy of a
+  deleted book) returns `404 "Copy not found"`.
+}

@@ -1,0 +1,31 @@
+meta {
+  name: Create second loans copy
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/books/{{loansBookId}}/copies
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "label": "Paperback"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("loansSecondCopyId", res.getBody().data.id);
+}
+
+tests {
+  test("creates a second copy of the same book", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

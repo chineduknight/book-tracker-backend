@@ -1,0 +1,30 @@
+meta {
+  name: Get loan
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/loans/{{loansLoanId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+tests {
+  test("returns the loan", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.id).to.equal(bru.getVar("loansLoanId"));
+    expect(res.getBody().data.borrowerName).to.equal("Ada Okafor");
+  });
+}
+
+docs {
+  # GET /api/v1/loans/:loanId
+
+  One of the reader's loans, also after its copy or book was deleted. A missing or foreign loan
+  returns `404 "Loan not found"`.
+}

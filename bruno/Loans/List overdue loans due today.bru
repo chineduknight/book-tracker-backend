@@ -1,0 +1,27 @@
+meta {
+  name: List overdue loans due today
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/loans?status=overdue&asOf=2026-11-10
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: overdue
+  asOf: 2026-11-10
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+tests {
+  test("excludes a loan due on the reference day", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data).to.eql([]);
+  });
+}

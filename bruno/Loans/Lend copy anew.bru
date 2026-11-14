@@ -1,0 +1,33 @@
+meta {
+  name: Lend copy anew
+  type: http
+  seq: 22
+}
+
+post {
+  url: {{baseUrl}}/copies/{{loansCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Chidi",
+    "lentOn": "2026-11-14"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("loansNewLoanId", res.getBody().data.id);
+}
+
+tests {
+  test("lends the returned copy again as a new loan", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.id).to.not.equal(bru.getVar("loansLoanId"));
+  });
+}

@@ -1,0 +1,40 @@
+meta {
+  name: Update loan
+  type: http
+  seq: 15
+}
+
+patch {
+  url: {{baseUrl}}/loans/{{loansLoanId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{loansAccessToken}}
+}
+
+body:json {
+  {
+    "dueOn": "2026-11-15",
+    "borrowerContact": null
+  }
+}
+
+tests {
+  test("extends the due date and clears the contact", function () {
+    expect(res.getStatus()).to.equal(200);
+    const loan = res.getBody().data;
+    expect(loan.dueOn).to.equal("2026-11-15");
+    expect(loan).to.not.have.property("borrowerContact");
+    expect(loan.returnedOn).to.equal(null);
+  });
+}
+
+docs {
+  # PATCH /api/v1/loans/:loanId
+
+  Corrects `borrowerName`, `borrowerContact` (`null` clears), `lentOn`, `dueOn` (`null` clears),
+  `note` (`null` clears) and, on a returned loan only, `returnedOn`. Chronology is validated on
+  the merged result (`dueOn` and `returnedOn` on or after `lentOn`). A loan can never be reopened.
+}
