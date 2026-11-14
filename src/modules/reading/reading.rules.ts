@@ -1,5 +1,6 @@
 import type { FieldValidationError } from '../../shared/request-validation.js';
 import type { BookLengths } from '../books/book.service.js';
+import type { BookReadingStatus } from './reading.dto.js';
 import type { ReadingProgress, ReadingSessionStatus } from './reading.schema.js';
 
 export interface ReadingSessionDates {
@@ -37,4 +38,17 @@ export function problemsWithProgress(
     return [{ field: 'progress.value', message: "must not exceed the book's chapter count" }];
   }
   return [];
+}
+
+/**
+ * A book's current reading status. An in-progress session wins even after earlier completed
+ * reads, because the reader is rereading it; the per-book overview and the dashboard both use this.
+ */
+export function readingStatusOf(
+  hasSessionInProgress: boolean,
+  completedSessions: number,
+): BookReadingStatus {
+  if (hasSessionInProgress) return 'reading';
+  if (completedSessions > 0) return 'completed';
+  return 'unread';
 }

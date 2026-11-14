@@ -1,0 +1,33 @@
+meta {
+  name: Recent activity
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/dashboard/recent-activity
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+tests {
+  test("lists every recorded resource once and no invented events", function () {
+    expect(res.getStatus()).to.equal(200);
+    const types = res.getBody().data.map((item) => item.type).sort();
+    expect(types).to.eql([
+      "book_added",
+      "book_added",
+      "highlight_added",
+      "loan_recorded",
+      "loan_recorded",
+      "note_added",
+      "reading_session_recorded",
+      "reading_session_recorded",
+      "wishlist_item_added",
+    ]);
+  });
+}

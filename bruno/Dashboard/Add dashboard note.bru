@@ -1,0 +1,28 @@
+meta {
+  name: Add dashboard note
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/books/{{dashboardEbookId}}/notes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {
+    "kind": "note",
+    "content": "Spice must flow"
+  }
+}
+
+tests {
+  test("adds a note to the ebook", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

@@ -1,0 +1,27 @@
+meta {
+  name: Record first read
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/books/{{dashboardBookId}}/reading-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {
+    "status": "completed"
+  }
+}
+
+tests {
+  test("records a completed first read", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

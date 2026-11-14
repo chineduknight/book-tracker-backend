@@ -1,0 +1,40 @@
+meta {
+  name: Reading statistics
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/dashboard/reading-statistics
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+tests {
+  test("splits reading by the book's format and adds up", function () {
+    expect(res.getStatus()).to.equal(200);
+    const { overall, byFormat } = res.getBody().data;
+    expect(overall.books).to.eql({ total: 2, unread: 1, reading: 1, completed: 0, everCompleted: 1 });
+    expect(overall.sessions).to.eql({ total: 2, inProgress: 1, completed: 1, rereads: 1 });
+    expect(byFormat.physical.books.reading).to.equal(1);
+    expect(byFormat.ebook.books.unread).to.equal(1);
+    for (const group of ["books", "sessions"]) {
+      for (const [field, value] of Object.entries(overall[group])) {
+        expect(value).to.equal(byFormat.physical[group][field] + byFormat.ebook[group][field]);
+      }
+    }
+  });
+}
+
+docs {
+  # GET /api/v1/dashboard/reading-statistics
+
+  Reading counters of the reader's visible books, overall and by the book's current format. No
+  query parameters are accepted. A book's status follows its reading overview: in progress wins,
+  then completed, else unread. `everCompleted` counts books with any completed session;
+  `sessions.rereads` counts every session after a book's first.
+}

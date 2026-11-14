@@ -36,11 +36,6 @@ export function problemWithReturnDateCorrection(
   ];
 }
 
-/** The current calendar day in UTC, the reference day for overdue loans when none is given. */
-export function utcCalendarDateOf(instant: Date): string {
-  return instant.toISOString().slice(0, 10);
-}
-
 export function loanStatusFilter(status: LoanStatusFilter, asOf: string) {
   switch (status) {
     case 'active':

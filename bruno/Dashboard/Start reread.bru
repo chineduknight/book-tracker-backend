@@ -1,0 +1,25 @@
+meta {
+  name: Start reread
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/books/{{dashboardBookId}}/reading-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {}
+}
+
+tests {
+  test("starts a reread", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

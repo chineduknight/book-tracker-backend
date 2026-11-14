@@ -1,0 +1,29 @@
+meta {
+  name: Create second dashboard copy
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/books/{{dashboardBookId}}/copies
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {}
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("dashboardSecondCopyId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the second copy", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

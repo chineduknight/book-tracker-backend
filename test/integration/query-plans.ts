@@ -39,3 +39,24 @@ export async function indexesUsedBy(query: Explainable): Promise<string[]> {
 export async function stagesUsedBy(query: Explainable): Promise<string[]> {
   return stageNamesIn(await winningPlanOf(query));
 }
+
+function winningPlansIn(explanation: unknown, plans: unknown[] = []): unknown[] {
+  if (Array.isArray(explanation)) explanation.forEach((part) => winningPlansIn(part, plans));
+  else if (typeof explanation === 'object' && explanation !== null) {
+    for (const [key, value] of Object.entries(explanation)) {
+      if (key === 'winningPlan') plans.push(value);
+      else winningPlansIn(value, plans);
+    }
+  }
+  return plans;
+}
+
+/** Indexes of the chosen plans in any explain output, including aggregation pipelines. */
+export function winningIndexesOf(explanation: unknown): string[] {
+  return indexNamesIn(winningPlansIn(explanation));
+}
+
+/** Stages of the chosen plans in any explain output, including aggregation pipelines. */
+export function winningStagesOf(explanation: unknown): string[] {
+  return stageNamesIn(winningPlansIn(explanation));
+}

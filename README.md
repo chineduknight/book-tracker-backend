@@ -12,8 +12,8 @@ lending history. Ebooks can be catalogued without storing any files.
 The API currently covers accounts and sessions, the private book catalogue, storage locations and
 physical copies, reading sessions with rereads, notes and highlights with owner-scoped text
 search, categories and collections for organizing the catalogue, a wishlist of books to obtain,
-and lending of physical copies with full history. Data export is still to come (see
-[Upcoming PRs](#upcoming-prs)).
+lending of physical copies with full history, and a derived Home dashboard with reading
+statistics. Data export is still to come (see [Upcoming PRs](#upcoming-prs)).
 
 ## Stack
 
@@ -104,66 +104,69 @@ All routes are under `/api/v1`. Success bodies are `{ "data": ... }`; errors are
 The [API contract](docs/api-contract.md) lists every status and body, including `HEAD`, CORS
 preflight and request-body errors.
 
-| Method                        | Path                                           | Purpose                                                                |
-| ----------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------- |
-| GET                           | `/api/v1/health`                               | Liveness. Always 200 while the process serves HTTP                     |
-| GET                           | `/api/v1/ready`                                | Readiness. 200 when MongoDB is connected, otherwise 503                |
-| POST                          | `/api/v1/auth/register`                        | Create an account and start a session (201)                            |
-| POST                          | `/api/v1/auth/login`                           | Start a session with email and password                                |
-| POST                          | `/api/v1/auth/refresh`                         | Exchange a refresh token for a new token pair                          |
-| POST                          | `/api/v1/auth/logout`                          | Revoke the session that owns a refresh token (204)                     |
-| GET                           | `/api/v1/auth/me`                              | The authenticated user (bearer access token)                           |
-| POST                          | `/api/v1/books`                                | Add a book to the reader's catalogue (201 + `Location`)                |
-| GET                           | `/api/v1/books`                                | List, search, filter and sort the reader's books (paginated)           |
-| GET                           | `/api/v1/books/duplicate-check`                | Suggest existing books with the same title or ISBN                     |
-| GET                           | `/api/v1/books/:bookId`                        | One of the reader's books                                              |
-| PATCH                         | `/api/v1/books/:bookId`                        | Change fields; `null` clears an optional field                         |
-| DELETE                        | `/api/v1/books/:bookId`                        | Soft-delete a book (204)                                               |
-| POST                          | `/api/v1/locations`                            | Create a named storage location (201 + `Location`)                     |
-| GET                           | `/api/v1/locations`                            | List the reader's locations alphabetically (paginated)                 |
-| GET                           | `/api/v1/locations/:locationId`                | One of the reader's locations                                          |
-| PATCH                         | `/api/v1/locations/:locationId`                | Rename a location or change/clear its description                      |
-| POST                          | `/api/v1/books/:bookId/copies`                 | Add a physical copy to a physical book (201 + `Location`)              |
-| GET                           | `/api/v1/books/:bookId/copies`                 | List a book's copies, filter by location or condition                  |
-| GET                           | `/api/v1/copies/:copyId`                       | One physical copy                                                      |
-| PATCH                         | `/api/v1/copies/:copyId`                       | Change label, condition, note or location; `null` clears               |
-| DELETE                        | `/api/v1/copies/:copyId`                       | Soft-delete a copy (204)                                               |
-| POST                          | `/api/v1/books/:bookId/reading-sessions`       | Start a reading, or record an earlier completed one (201 + `Location`) |
-| GET                           | `/api/v1/books/:bookId/reading-sessions`       | One book's reading history (paginated)                                 |
-| GET                           | `/api/v1/books/:bookId/reading-overview`       | Derived reading status (`unread`, `reading`, `completed`) and sessions |
-| GET                           | `/api/v1/reading-sessions`                     | All of the reader's reading history (paginated)                        |
-| GET                           | `/api/v1/reading-sessions/:sessionId`          | One reading session                                                    |
-| PATCH                         | `/api/v1/reading-sessions/:sessionId`          | Record progress, finish, or correct a session                          |
-| POST                          | `/api/v1/books/:bookId/notes`                  | Add a note or highlight, optionally linked to a session (201)          |
-| GET                           | `/api/v1/books/:bookId/notes`                  | One book's notes: filter by kind, chapter, session or words            |
-| GET                           | `/api/v1/notes`                                | All of the reader's notes, with the same filters plus `bookId`         |
-| GET                           | `/api/v1/notes/:noteId`                        | One note or highlight                                                  |
-| PATCH                         | `/api/v1/notes/:noteId`                        | Change text, title, commentary, chapter or page; `null` clears         |
-| DELETE                        | `/api/v1/notes/:noteId`                        | Soft-delete a note (204)                                               |
-| GET                           | `/api/v1/categories/presets`                   | Read-only starter category names (nothing is created)                  |
-| POST                          | `/api/v1/categories`                           | Create a category, unique per reader by normalized name (201)          |
-| GET                           | `/api/v1/categories`                           | List the reader's categories alphabetically (paginated)                |
-| GET                           | `/api/v1/categories/:categoryId`               | One category                                                           |
-| PATCH                         | `/api/v1/categories/:categoryId`               | Rename or change/clear the description                                 |
-| DELETE                        | `/api/v1/categories/:categoryId`               | Soft-delete a category; books are untouched (204)                      |
-| PUT                           | `/api/v1/categories/:categoryId/books/:bookId` | Add a book to the category (idempotent, 204)                           |
-| DELETE                        | `/api/v1/categories/:categoryId/books/:bookId` | Remove a book from the category (idempotent, 204)                      |
-| GET                           | `/api/v1/categories/:categoryId/books`         | The category's visible books in membership order (paginated)           |
-| POST, GET, PATCH, DELETE, PUT | `/api/v1/collections...`                       | The same endpoints for reader-curated collections                      |
-| GET                           | `/api/v1/books/:bookId/organization`           | The categories and collections containing one book                     |
-| POST                          | `/api/v1/wishlist`                             | Record a book the reader wants (201 + `Location`)                      |
-| GET                           | `/api/v1/wishlist`                             | List and search wishes by status, priority and words (paginated)       |
-| GET                           | `/api/v1/wishlist/:wishlistItemId`             | One wishlist item                                                      |
-| PATCH                         | `/api/v1/wishlist/:wishlistItemId`             | Edit descriptive fields; `null` clears                                 |
-| PUT                           | `/api/v1/wishlist/:wishlistItemId/acquisition` | Link an owned book and mark the wish acquired (idempotent)             |
-| DELETE                        | `/api/v1/wishlist/:wishlistItemId`             | Soft-delete a wishlist item (204)                                      |
-| POST                          | `/api/v1/copies/:copyId/loans`                 | Lend a physical copy; one active loan per copy (201 + `Location`)      |
-| GET                           | `/api/v1/copies/:copyId/loans`                 | One copy's lending history (paginated)                                 |
-| GET                           | `/api/v1/copies/:copyId/loan-overview`         | Derived availability and the active loan                               |
-| GET                           | `/api/v1/loans`                                | All loans: active (default), returned, overdue or all (paginated)      |
-| GET                           | `/api/v1/loans/:loanId`                        | One loan, also after its copy or book was deleted                      |
-| PATCH                         | `/api/v1/loans/:loanId`                        | Correct borrower details and dates; never reopens                      |
-| PUT                           | `/api/v1/loans/:loanId/return`                 | Record the return (idempotent for the same date)                       |
+| Method                        | Path                                           | Purpose                                                                   |
+| ----------------------------- | ---------------------------------------------- | ------------------------------------------------------------------------- |
+| GET                           | `/api/v1/health`                               | Liveness. Always 200 while the process serves HTTP                        |
+| GET                           | `/api/v1/ready`                                | Readiness. 200 when MongoDB is connected, otherwise 503                   |
+| POST                          | `/api/v1/auth/register`                        | Create an account and start a session (201)                               |
+| POST                          | `/api/v1/auth/login`                           | Start a session with email and password                                   |
+| POST                          | `/api/v1/auth/refresh`                         | Exchange a refresh token for a new token pair                             |
+| POST                          | `/api/v1/auth/logout`                          | Revoke the session that owns a refresh token (204)                        |
+| GET                           | `/api/v1/auth/me`                              | The authenticated user (bearer access token)                              |
+| POST                          | `/api/v1/books`                                | Add a book to the reader's catalogue (201 + `Location`)                   |
+| GET                           | `/api/v1/books`                                | List, search, filter and sort the reader's books (paginated)              |
+| GET                           | `/api/v1/books/duplicate-check`                | Suggest existing books with the same title or ISBN                        |
+| GET                           | `/api/v1/books/:bookId`                        | One of the reader's books                                                 |
+| PATCH                         | `/api/v1/books/:bookId`                        | Change fields; `null` clears an optional field                            |
+| DELETE                        | `/api/v1/books/:bookId`                        | Soft-delete a book (204)                                                  |
+| POST                          | `/api/v1/locations`                            | Create a named storage location (201 + `Location`)                        |
+| GET                           | `/api/v1/locations`                            | List the reader's locations alphabetically (paginated)                    |
+| GET                           | `/api/v1/locations/:locationId`                | One of the reader's locations                                             |
+| PATCH                         | `/api/v1/locations/:locationId`                | Rename a location or change/clear its description                         |
+| POST                          | `/api/v1/books/:bookId/copies`                 | Add a physical copy to a physical book (201 + `Location`)                 |
+| GET                           | `/api/v1/books/:bookId/copies`                 | List a book's copies, filter by location or condition                     |
+| GET                           | `/api/v1/copies/:copyId`                       | One physical copy                                                         |
+| PATCH                         | `/api/v1/copies/:copyId`                       | Change label, condition, note or location; `null` clears                  |
+| DELETE                        | `/api/v1/copies/:copyId`                       | Soft-delete a copy (204)                                                  |
+| POST                          | `/api/v1/books/:bookId/reading-sessions`       | Start a reading, or record an earlier completed one (201 + `Location`)    |
+| GET                           | `/api/v1/books/:bookId/reading-sessions`       | One book's reading history (paginated)                                    |
+| GET                           | `/api/v1/books/:bookId/reading-overview`       | Derived reading status (`unread`, `reading`, `completed`) and sessions    |
+| GET                           | `/api/v1/reading-sessions`                     | All of the reader's reading history (paginated)                           |
+| GET                           | `/api/v1/reading-sessions/:sessionId`          | One reading session                                                       |
+| PATCH                         | `/api/v1/reading-sessions/:sessionId`          | Record progress, finish, or correct a session                             |
+| POST                          | `/api/v1/books/:bookId/notes`                  | Add a note or highlight, optionally linked to a session (201)             |
+| GET                           | `/api/v1/books/:bookId/notes`                  | One book's notes: filter by kind, chapter, session or words               |
+| GET                           | `/api/v1/notes`                                | All of the reader's notes, with the same filters plus `bookId`            |
+| GET                           | `/api/v1/notes/:noteId`                        | One note or highlight                                                     |
+| PATCH                         | `/api/v1/notes/:noteId`                        | Change text, title, commentary, chapter or page; `null` clears            |
+| DELETE                        | `/api/v1/notes/:noteId`                        | Soft-delete a note (204)                                                  |
+| GET                           | `/api/v1/categories/presets`                   | Read-only starter category names (nothing is created)                     |
+| POST                          | `/api/v1/categories`                           | Create a category, unique per reader by normalized name (201)             |
+| GET                           | `/api/v1/categories`                           | List the reader's categories alphabetically (paginated)                   |
+| GET                           | `/api/v1/categories/:categoryId`               | One category                                                              |
+| PATCH                         | `/api/v1/categories/:categoryId`               | Rename or change/clear the description                                    |
+| DELETE                        | `/api/v1/categories/:categoryId`               | Soft-delete a category; books are untouched (204)                         |
+| PUT                           | `/api/v1/categories/:categoryId/books/:bookId` | Add a book to the category (idempotent, 204)                              |
+| DELETE                        | `/api/v1/categories/:categoryId/books/:bookId` | Remove a book from the category (idempotent, 204)                         |
+| GET                           | `/api/v1/categories/:categoryId/books`         | The category's visible books in membership order (paginated)              |
+| POST, GET, PATCH, DELETE, PUT | `/api/v1/collections...`                       | The same endpoints for reader-curated collections                         |
+| GET                           | `/api/v1/books/:bookId/organization`           | The categories and collections containing one book                        |
+| POST                          | `/api/v1/wishlist`                             | Record a book the reader wants (201 + `Location`)                         |
+| GET                           | `/api/v1/wishlist`                             | List and search wishes by status, priority and words (paginated)          |
+| GET                           | `/api/v1/wishlist/:wishlistItemId`             | One wishlist item                                                         |
+| PATCH                         | `/api/v1/wishlist/:wishlistItemId`             | Edit descriptive fields; `null` clears                                    |
+| PUT                           | `/api/v1/wishlist/:wishlistItemId/acquisition` | Link an owned book and mark the wish acquired (idempotent)                |
+| DELETE                        | `/api/v1/wishlist/:wishlistItemId`             | Soft-delete a wishlist item (204)                                         |
+| POST                          | `/api/v1/copies/:copyId/loans`                 | Lend a physical copy; one active loan per copy (201 + `Location`)         |
+| GET                           | `/api/v1/copies/:copyId/loans`                 | One copy's lending history (paginated)                                    |
+| GET                           | `/api/v1/copies/:copyId/loan-overview`         | Derived availability and the active loan                                  |
+| GET                           | `/api/v1/loans`                                | All loans: active (default), returned, overdue or all (paginated)         |
+| GET                           | `/api/v1/loans/:loanId`                        | One loan, also after its copy or book was deleted                         |
+| PATCH                         | `/api/v1/loans/:loanId`                        | Correct borrower details and dates; never reopens                         |
+| PUT                           | `/api/v1/loans/:loanId/return`                 | Record the return (idempotent for the same date)                          |
+| GET                           | `/api/v1/dashboard/summary`                    | Derived library counts; overdue loans as of `asOf` (UTC today by default) |
+| GET                           | `/api/v1/dashboard/reading-statistics`         | Reading buckets, lifetime completions and rereads, overall and by format  |
+| GET                           | `/api/v1/dashboard/recent-activity`            | The newest recorded books, sessions, notes, wishes and loans (ids only)   |
 
 Authentication uses bearer tokens in JSON: a 15-minute access token and a single-use refresh
 token for a 30-day session. Token storage for a future browser frontend is **not decided yet**;
@@ -194,6 +197,7 @@ src/
 ├── modules/organization/  # one book's categories and collections (reverse lookup)
 ├── modules/wishlist/      # wanted books, priorities, search and acquisition links to owned books
 ├── modules/loans/         # lending of physical copies: one active loan per copy, full history
+├── modules/dashboard/     # read-only derived summary, reading statistics and recent activity
 ├── modules/health/        # liveness and readiness routes + response DTOs
 ├── modules/users/         # user model, public UserDto, user service
 └── shared/                # AppError, response envelopes, request validation, safe errors
@@ -234,7 +238,8 @@ overview, notes and highlights (Markdown source, optional session link, owner-sc
 soft delete), categories and collections (opt-in presets, per-reader unique names, idempotent
 ordered memberships, soft delete), a wishlist (priorities, search, explicit acquisition linking an
 owned book, soft delete), lending (one active loan per copy enforced by the database, returns,
-overdue view, history that survives copy deletion), tests, CI, Bruno.
+overdue view, history that survives copy deletion), a read-only dashboard (summary, reading
+statistics, recent activity), tests, CI, Bruno.
 
 Not included yet: email verification, password reset, OAuth, export, loan reminders, wish un-acquire,
 nested categories,
@@ -243,4 +248,6 @@ reading-session deletion, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Export**: full per-user data export.
+1. **Export & data portability**: full per-user data export.
+2. **Backend hardening** across modules.
+3. **Deployment and operations.**

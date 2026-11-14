@@ -1,0 +1,22 @@
+meta {
+  name: Empty recent activity
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/dashboard/recent-activity
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+tests {
+  test("returns an empty list", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody()).to.eql({ data: [] });
+  });
+}

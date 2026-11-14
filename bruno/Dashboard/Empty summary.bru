@@ -1,0 +1,40 @@
+meta {
+  name: Empty summary
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/dashboard/summary
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+tests {
+  test("returns zeros everywhere and today's UTC date", function () {
+    expect(res.getStatus()).to.equal(200);
+    const summary = res.getBody().data;
+    expect(summary.asOf).to.equal(new Date().toISOString().slice(0, 10));
+    expect(summary.catalogue).to.eql({ totalBooks: 0, physicalBooks: 0, ebooks: 0, physicalCopies: 0 });
+    expect(summary.reading).to.eql({
+      unreadBooks: 0, currentlyReadingBooks: 0, completedBooks: 0, booksEverCompleted: 0,
+      totalSessions: 0, completedSessions: 0, rereadSessions: 0,
+    });
+    expect(summary.notes).to.eql({ notes: 0, highlights: 0 });
+    expect(summary.wishlist).to.eql({ wanted: 0, acquired: 0 });
+    expect(summary.lending).to.eql({ activeLoans: 0, overdueLoans: 0, returnedLoans: 0 });
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # GET /api/v1/dashboard/summary
+
+  Counts for the Home screen. Query: optional `asOf` (`YYYY-MM-DD`), the reference day for
+  overdue loans only; it defaults to the current **UTC** calendar day and is echoed back.
+  Every field is always present; a new account gets zeros, never `null`.
+}

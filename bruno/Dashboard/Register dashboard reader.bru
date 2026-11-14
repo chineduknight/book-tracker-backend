@@ -1,0 +1,37 @@
+meta {
+  name: Register dashboard reader
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno Dashboard Reader",
+    "email": "{{dashboardEmail}}",
+    "password": "{{dashboardPassword}}"
+  }
+}
+
+script:pre-request {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  bru.setVar("dashboardEmail", `bruno-dashboard-${runId}@example.test`);
+  bru.setVar("dashboardPassword", `disposable-${runId}`);
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("dashboardAccessToken", res.getBody().data.tokens.accessToken);
+  }
+}
+
+tests {
+  test("creates the disposable reader used by this folder", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

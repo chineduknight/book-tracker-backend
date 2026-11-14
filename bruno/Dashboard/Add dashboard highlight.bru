@@ -1,0 +1,28 @@
+meta {
+  name: Add dashboard highlight
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/books/{{dashboardBookId}}/notes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {
+    "kind": "highlight",
+    "content": "You have power over your mind"
+  }
+}
+
+tests {
+  test("adds a highlight to the physical book", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

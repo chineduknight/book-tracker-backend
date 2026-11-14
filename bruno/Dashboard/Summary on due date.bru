@@ -1,0 +1,26 @@
+meta {
+  name: Summary on due date
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/dashboard/summary?asOf=2026-01-10
+  body: none
+  auth: bearer
+}
+
+params:query {
+  asOf: 2026-01-10
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+tests {
+  test("does not count a loan due on asOf as overdue", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.lending.overdueLoans).to.equal(0);
+  });
+}

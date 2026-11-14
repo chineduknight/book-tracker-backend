@@ -1,0 +1,27 @@
+meta {
+  name: Return second dashboard loan
+  type: http
+  seq: 15
+}
+
+put {
+  url: {{baseUrl}}/loans/{{dashboardSecondLoanId}}/return
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {
+    "returnedOn": "2026-01-05"
+  }
+}
+
+tests {
+  test("returns the second loan", function () {
+    expect(res.getStatus()).to.equal(200);
+  });
+}

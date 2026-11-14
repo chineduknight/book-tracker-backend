@@ -1,7 +1,9 @@
+import mongoose from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
 import { AppError } from '../../shared/errors.js';
 import {
   isActiveBookOwnedByUser,
+  keepDocumentsOfActiveBooks,
   requireActiveBookOwnedByUser,
   reserveBookForPhysicalCopy,
 } from '../books/book.service.js';
@@ -134,4 +136,18 @@ export async function deleteCopyOwnedByUser(ownerId: string, copyId: string): Pr
     $set: { deletedAt: new Date() },
   });
   if (matchedCount === 0) throw copyNotFoundError();
+}
+
+/**
+ * Active copies of the owner whose book is also active. Copies are grouped per book first, so
+ * the active-book join runs once per book rather than once per copy.
+ */
+export async function countVisibleCopiesOwnedByUser(ownerId: string): Promise<number> {
+  const [result] = await PhysicalCopyModel.aggregate<{ copies: number }>([
+    { $match: { ownerId: new mongoose.Types.ObjectId(ownerId), deletedAt: null } },
+    { $group: { _id: '$bookId', copies: { $sum: 1 } } },
+    ...keepDocumentsOfActiveBooks(ownerId, '_id'),
+    { $group: { _id: null, copies: { $sum: '$copies' } } },
+  ]);
+  return result?.copies ?? 0;
 }

@@ -7,7 +7,6 @@ import {
   loanStatusFilter,
   problemsWithLoanDates,
   problemWithReturnDateCorrection,
-  utcCalendarDateOf,
 } from '../src/modules/loans/loan.rules.js';
 import {
   createLoanRequestSchema,
@@ -15,6 +14,7 @@ import {
   returnLoanRequestSchema,
   updateLoanRequestSchema,
 } from '../src/modules/loans/loan.schema.js';
+import { utcCalendarDateOf } from '../src/shared/calendar-date.js';
 import { createTestApp } from './helpers.js';
 
 const SOME_ID = '64b7f0c2a1b2c3d4e5f60718';

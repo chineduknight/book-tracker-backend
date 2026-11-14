@@ -1,0 +1,43 @@
+meta {
+  name: Recent activity with limit
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/dashboard/recent-activity?limit=3
+  body: none
+  auth: bearer
+}
+
+params:query {
+  limit: 3
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+tests {
+  test("returns the three newest records, ids and types only", function () {
+    expect(res.getStatus()).to.equal(200);
+    const activities = res.getBody().data;
+    expect(activities.map((item) => item.type)).to.eql([
+      "loan_recorded",
+      "loan_recorded",
+      "wishlist_item_added",
+    ]);
+    expect(activities[0].resourceId).to.equal(bru.getVar("dashboardSecondLoanId"));
+    expect(activities[2].bookId).to.equal(null);
+    expect(Object.keys(activities[0]).sort()).to.eql(["bookId", "occurredAt", "resourceId", "type"]);
+  });
+}
+
+docs {
+  # GET /api/v1/dashboard/recent-activity
+
+  The newest recorded resources across books, reading sessions, notes, highlights, wishes and
+  loans, by creation time. Query: `limit` 1–20 (default 10). Only ids, types and timestamps are
+  returned. Edits, returns, completions and acquisitions are not events: the data keeps no
+  reliable timestamp for them.
+}

@@ -25,13 +25,13 @@ export function singleQueryChoice<const Choices extends readonly [string, ...str
   });
 }
 
-const positiveWholeNumber = singleQueryValue
+export const positiveWholeNumberQueryValue = singleQueryValue
   .regex(POSITIVE_WHOLE_NUMBER, 'must be a positive whole number')
   .transform(Number)
   .pipe(z.number().int('is too large'));
 
-export const pageQueryParameter = positiveWholeNumber.default(1);
-export const limitQueryParameter = positiveWholeNumber
+export const pageQueryParameter = positiveWholeNumberQueryValue.default(1);
+export const limitQueryParameter = positiveWholeNumberQueryValue
   .pipe(z.number().max(MAX_PAGE_LIMIT))
   .default(DEFAULT_PAGE_LIMIT);
 export const objectIdQueryParameter = singleQueryValue.pipe(objectIdSchema);

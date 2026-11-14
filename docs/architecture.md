@@ -221,6 +221,36 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   an owner-scoped index and no collection scan rather than one fixed plan. No due-date index is
   added until measurements justify it.
 
+## Dashboard
+
+- `modules/dashboard` serves `/dashboard/summary`, `/dashboard/reading-statistics` and
+  `/dashboard/recent-activity`. It has **no model and makes no writes**: it composes read-only
+  exports of the modules that own the data and does the pure calculations in
+  `dashboard.rules.ts`. It never imports another module's model.
+- Read-side exports it uses, each owner-scoped and following its module's visibility policy:
+  - books: `listActiveBookIdentities` (id and format of every active book, nothing else) and
+    `listRecentlyAddedBooks`;
+  - reading: `tallyReadingSessionsOfActiveBooks` (one aggregation grouping the owner's sessions
+    per book, then joining active books once per book) and `listRecentlyRecordedSessions`;
+  - copies: `countVisibleCopiesOwnedByUser` (copies grouped per book, then the active-book join);
+  - notes: `countVisibleNotesByKind` and `listRecentlyAddedNotes`;
+  - wishlist: `countWishlistItemsByStatus` and `listRecentlyAddedWishlistItems`;
+  - loans: `countLoansOwnedByUser` and `listRecentlyRecordedLoans`, deliberately without any
+    parent-visibility join.
+- The reading status rule is `readingStatusOf` in `reading.rules.ts`, shared by the per-book
+  overview and the dashboard so they cannot disagree. The list of active book identities is the
+  authority for which books exist: the status buckets are computed over exactly that list, and
+  tallies of other books are ignored, so `totalBooks` always equals the sum of the buckets even if
+  a book is deleted between the two queries. Summary and reading statistics share one calculation.
+- Recent activity asks each of the five sources for at most `limit` of its newest visible records
+  (sessions and notes filter out hidden books **before** the limit, inside the aggregation), then
+  merges and truncates. Within a source the order (`createdAt`, `_id` descending) matches the
+  global order, so the merged result is exact.
+- Queries per request are constant: no per-book queries (tested by counting database operations
+  for a small and a larger library). Every query leads with an owner-scoped index; the newest
+  wishes need a small in-memory sort because the wishlist indexes put `status` before `createdAt`,
+  which is acceptable at personal-library scale.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.

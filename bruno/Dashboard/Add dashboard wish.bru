@@ -1,0 +1,27 @@
+meta {
+  name: Add dashboard wish
+  type: http
+  seq: 10
+}
+
+post {
+  url: {{baseUrl}}/wishlist
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{dashboardAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Letters from a Stoic"
+  }
+}
+
+tests {
+  test("adds a wish", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
