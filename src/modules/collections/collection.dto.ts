@@ -21,3 +21,19 @@ export function toPublicBookCollection(collection: BookCollectionRecord): BookCo
     updatedAt: collection.updatedAt.toISOString(),
   };
 }
+
+/** A collection in the archive, with its member book ids in membership order. */
+export interface BookCollectionExportDto extends BookCollectionDto {
+  bookIds: string[];
+  deletedAt: string | null;
+}
+
+export function toArchivedBookCollection(
+  collection: BookCollectionRecord,
+): BookCollectionExportDto {
+  return {
+    ...toPublicBookCollection(collection),
+    bookIds: collection.bookIds.map((bookId) => bookId.toHexString()),
+    deletedAt: collection.deletedAt?.toISOString() ?? null,
+  };
+}

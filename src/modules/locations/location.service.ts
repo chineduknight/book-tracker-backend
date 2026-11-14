@@ -1,5 +1,6 @@
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { toCaseInsensitiveKey } from '../../shared/text.js';
 import { toPublicStorageLocation, type StorageLocationDto } from './location.dto.js';
@@ -108,4 +109,16 @@ export async function updateLocationOwnedByUser(
 export async function requireLocationOwnedByUser(ownerId: string, locationId: string) {
   const location = await LocationModel.exists(locationOwnedBy(ownerId, locationId));
   if (!location) throw locationNotFoundError();
+}
+
+/** Every location of the owner, oldest first, for the data export. */
+export async function* streamLocationsForArchive(
+  ownerId: string,
+): AsyncGenerator<StorageLocationDto> {
+  for await (const location of LocationModel.find({ ownerId })
+    .sort(ARCHIVE_ORDER)
+    .lean()
+    .cursor()) {
+    yield toPublicStorageLocation(location);
+  }
 }

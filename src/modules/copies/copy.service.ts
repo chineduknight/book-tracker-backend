@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import {
   isActiveBookOwnedByUser,
@@ -8,7 +9,12 @@ import {
   reserveBookForPhysicalCopy,
 } from '../books/book.service.js';
 import { requireLocationOwnedByUser } from '../locations/location.service.js';
-import { toPublicPhysicalCopy, type PhysicalCopyDto } from './copy.dto.js';
+import {
+  toArchivedPhysicalCopy,
+  toPublicPhysicalCopy,
+  type PhysicalCopyDto,
+  type PhysicalCopyExportDto,
+} from './copy.dto.js';
 import { PhysicalCopyModel, type PhysicalCopyRecord } from './copy.model.js';
 import type { CopyListQuery, NewPhysicalCopy, PhysicalCopyChanges } from './copy.schema.js';
 
@@ -150,4 +156,16 @@ export async function countVisibleCopiesOwnedByUser(ownerId: string): Promise<nu
     { $group: { _id: null, copies: { $sum: '$copies' } } },
   ]);
   return result?.copies ?? 0;
+}
+
+/** Every copy of the owner, deleted ones included, oldest first, for the data export. */
+export async function* streamCopiesForArchive(
+  ownerId: string,
+): AsyncGenerator<PhysicalCopyExportDto> {
+  for await (const copy of PhysicalCopyModel.find({ ownerId })
+    .sort(ARCHIVE_ORDER)
+    .lean()
+    .cursor()) {
+    yield toArchivedPhysicalCopy(copy);
+  }
 }

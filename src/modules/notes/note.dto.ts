@@ -35,3 +35,11 @@ export function toPublicNote(note: NoteRecord): NoteDto {
     updatedAt: note.updatedAt.toISOString(),
   };
 }
+
+export interface NoteExportDto extends NoteDto {
+  deletedAt: string | null;
+}
+
+export function toArchivedNote(note: NoteRecord): NoteExportDto {
+  return { ...toPublicNote(note), deletedAt: note.deletedAt?.toISOString() ?? null };
+}

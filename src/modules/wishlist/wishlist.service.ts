@@ -1,9 +1,15 @@
 import mongoose from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { toTextSearchWords } from '../../shared/text.js';
 import { requireActiveBookOwnedByUser } from '../books/book.service.js';
-import { toPublicWishlistItem, type WishlistItemDto } from './wishlist.dto.js';
+import {
+  toArchivedWishlistItem,
+  toPublicWishlistItem,
+  type WishlistItemDto,
+  type WishlistItemExportDto,
+} from './wishlist.dto.js';
 import { WishlistItemModel, type WishlistItemRecord } from './wishlist.model.js';
 import { normalizeWishTitle, priorityRankOf } from './wishlist.rules.js';
 import type {
@@ -197,4 +203,16 @@ export async function listRecentlyAddedWishlistItems(
     wishlistItemId: item._id.toHexString(),
     createdAt: item.createdAt,
   }));
+}
+
+/** Every wish of the owner, deleted ones included, oldest first, for the data export. */
+export async function* streamWishlistItemsForArchive(
+  ownerId: string,
+): AsyncGenerator<WishlistItemExportDto> {
+  for await (const item of WishlistItemModel.find({ ownerId })
+    .sort(ARCHIVE_ORDER)
+    .lean()
+    .cursor()) {
+    yield toArchivedWishlistItem(item);
+  }
 }

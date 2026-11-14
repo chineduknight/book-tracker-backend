@@ -29,3 +29,11 @@ export function toPublicPhysicalCopy(copy: PhysicalCopyRecord): PhysicalCopyDto 
     updatedAt: copy.updatedAt.toISOString(),
   };
 }
+
+export interface PhysicalCopyExportDto extends PhysicalCopyDto {
+  deletedAt: string | null;
+}
+
+export function toArchivedPhysicalCopy(copy: PhysicalCopyRecord): PhysicalCopyExportDto {
+  return { ...toPublicPhysicalCopy(copy), deletedAt: copy.deletedAt?.toISOString() ?? null };
+}

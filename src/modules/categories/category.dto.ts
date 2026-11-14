@@ -22,3 +22,17 @@ export function toPublicCategory(category: CategoryRecord): CategoryDto {
     updatedAt: category.updatedAt.toISOString(),
   };
 }
+
+/** A category in the archive, with its member book ids in membership order. */
+export interface CategoryExportDto extends CategoryDto {
+  bookIds: string[];
+  deletedAt: string | null;
+}
+
+export function toArchivedCategory(category: CategoryRecord): CategoryExportDto {
+  return {
+    ...toPublicCategory(category),
+    bookIds: category.bookIds.map((bookId) => bookId.toHexString()),
+    deletedAt: category.deletedAt?.toISOString() ?? null,
+  };
+}
