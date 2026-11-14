@@ -51,10 +51,11 @@ run **Register** first.
 ## Books requests
 
 The **Books**, **Locations**, **Copies**, **Reading**, **Notes**, **Categories**,
-**Collections** and **Wishlist** folders each start by registering their own disposable reader
-(`booksAccessToken`, `locationsAccessToken`, `copiesAccessToken`, `readingAccessToken`,
-`notesAccessToken`, `categoriesAccessToken`, `collectionsAccessToken`, `wishlistAccessToken`)
-and create their own books, locations, reading sessions, groups and wishes. None reuses the Auth folder's tokens, which that folder
+**Collections**, **Wishlist** and **Loans** folders each start by registering their own
+disposable reader (`booksAccessToken`, `locationsAccessToken`, `copiesAccessToken`,
+`readingAccessToken`, `notesAccessToken`, `categoriesAccessToken`, `collectionsAccessToken`,
+`wishlistAccessToken`, `loansAccessToken`) and create their own books, copies, locations, reading
+sessions, groups, wishes and loans. None reuses the Auth folder's tokens, which that folder
 deliberately logs out, so each folder runs reliably on its own or as part of the whole collection.
 
 ## Repeatable runs: `npm run api:smoke`
@@ -90,7 +91,7 @@ npm run api:smoke
 ```
 
 `npm run api:test` runs the collection against an API you started yourself (for example
-`npm run dev`). A full run makes twelve registration attempts (three in Auth, one in each other
+`npm run dev`). A full run makes thirteen registration attempts (three in Auth, one in each other
 folder), so against a long-running API only one full run fits in the hourly per-address
 registration limit; restart the API or use `api:smoke`.
 
