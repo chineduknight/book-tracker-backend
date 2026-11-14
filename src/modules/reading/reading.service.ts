@@ -13,13 +13,13 @@ import {
 import {
   toPublicReadingSession,
   type BookReadingOverviewDto,
-  type BookReadingStatus,
   type ReadingSessionDto,
 } from './reading.dto.js';
 import { ReadingSessionModel, type ReadingSessionRecord } from './reading.model.js';
 import {
   problemsWithProgress,
   problemsWithReadingDates,
+  readingStatusOf,
   type ReadingSessionDates,
 } from './reading.rules.js';
 import type {
@@ -122,12 +122,6 @@ async function findVisibleSession(
   const bookLengths = await findLengthsOfActiveBook(ownerId, session.bookId.toHexString());
   if (!bookLengths) throw readingSessionNotFoundError();
   return { session, bookLengths };
-}
-
-function readingStatusOf(hasActiveSession: boolean, completedSessions: number): BookReadingStatus {
-  if (hasActiveSession) return 'reading';
-  if (completedSessions > 0) return 'completed';
-  return 'unread';
 }
 
 export async function startReadingSession(
@@ -300,4 +294,72 @@ export async function updateReadingSessionOwnedByUser(
     if (updatedSession) return toPublicReadingSession(updatedSession);
   }
   throw readingSessionUpdateConflictError();
+}
+
+export interface BookReadingTally {
+  bookId: string;
+  sessions: number;
+  completedSessions: number;
+  inProgressSessions: number;
+}
+
+/**
+ * Session counts for each active book of the owner that has sessions, in one aggregation:
+ * sessions are grouped per book first, so the active-book join runs once per book.
+ */
+export async function tallyReadingSessionsOfActiveBooks(
+  ownerId: string,
+): Promise<BookReadingTally[]> {
+  const tallies = await ReadingSessionModel.aggregate<{
+    _id: mongoose.Types.ObjectId;
+    sessions: number;
+    completedSessions: number;
+    inProgressSessions: number;
+  }>([
+    { $match: { ownerId: toObjectId(ownerId) } },
+    {
+      $group: {
+        _id: '$bookId',
+        sessions: { $sum: 1 },
+        completedSessions: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } },
+        inProgressSessions: { $sum: { $cond: [{ $eq: ['$status', 'in_progress'] }, 1, 0] } },
+      },
+    },
+    ...keepDocumentsOfActiveBooks(ownerId, '_id'),
+  ]);
+  return tallies.map(({ _id, sessions, completedSessions, inProgressSessions }) => ({
+    bookId: _id.toHexString(),
+    sessions,
+    completedSessions,
+    inProgressSessions,
+  }));
+}
+
+export interface RecentlyRecordedSession {
+  sessionId: string;
+  bookId: string;
+  createdAt: Date;
+}
+
+/** The newest sessions of active books; hidden books are filtered out before the limit applies. */
+export async function listRecentlyRecordedSessions(
+  ownerId: string,
+  limit: number,
+): Promise<RecentlyRecordedSession[]> {
+  const sessions = await ReadingSessionModel.aggregate<{
+    _id: mongoose.Types.ObjectId;
+    bookId: mongoose.Types.ObjectId;
+    createdAt: Date;
+  }>([
+    { $match: { ownerId: toObjectId(ownerId) } },
+    { $sort: HISTORY_ORDERS.recent },
+    ...keepDocumentsOfActiveBooks(ownerId, 'bookId'),
+    { $limit: limit },
+    { $project: { bookId: 1, createdAt: 1 } },
+  ]);
+  return sessions.map(({ _id, bookId, createdAt }) => ({
+    sessionId: _id.toHexString(),
+    bookId: bookId.toHexString(),
+    createdAt,
+  }));
 }

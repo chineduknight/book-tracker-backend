@@ -15,6 +15,11 @@ export function isExistingCalendarDate(text: string): boolean {
   );
 }
 
+/** The UTC calendar day of an instant, the reference day when a client gives none. */
+export function utcCalendarDateOf(instant: Date): string {
+  return instant.toISOString().slice(0, 10);
+}
+
 /** A calendar day as entered by the reader, kept as `YYYY-MM-DD` with no time zone applied. */
 export const calendarDateSchema = z
   .string()

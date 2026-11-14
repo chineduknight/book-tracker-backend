@@ -163,3 +163,38 @@ export async function deleteWishlistItemOwnedByUser(
   );
   if (matchedCount === 0) throw wishlistItemNotFoundError();
 }
+
+export interface WishlistCounts {
+  wanted: number;
+  acquired: number;
+}
+
+/** Non-deleted wishes by status; an acquired wish counts even if its book was later deleted. */
+export async function countWishlistItemsByStatus(ownerId: string): Promise<WishlistCounts> {
+  const [wanted, acquired] = await Promise.all(
+    (['wanted', 'acquired'] as const).map((status) =>
+      WishlistItemModel.countDocuments({ ...activeItemsOwnedBy(ownerId), status }),
+    ),
+  );
+  return { wanted: wanted ?? 0, acquired: acquired ?? 0 };
+}
+
+export interface RecentlyAddedWishlistItem {
+  wishlistItemId: string;
+  createdAt: Date;
+}
+
+export async function listRecentlyAddedWishlistItems(
+  ownerId: string,
+  limit: number,
+): Promise<RecentlyAddedWishlistItem[]> {
+  const items = await WishlistItemModel.find(activeItemsOwnedBy(ownerId))
+    .sort(SORT_ORDERS.recent)
+    .limit(limit)
+    .select({ createdAt: 1 })
+    .lean();
+  return items.map((item) => ({
+    wishlistItemId: item._id.toHexString(),
+    createdAt: item.createdAt,
+  }));
+}

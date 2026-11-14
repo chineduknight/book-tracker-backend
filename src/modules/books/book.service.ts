@@ -1,7 +1,12 @@
 import mongoose, { type PipelineStage, type Types } from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
 import { AppError } from '../../shared/errors.js';
-import { toPublicBook, type BookDto, type DuplicateSuggestionDto } from './book.dto.js';
+import {
+  toPublicBook,
+  type BookDto,
+  type BookFormat,
+  type DuplicateSuggestionDto,
+} from './book.dto.js';
 import { pageOf, visibleMembersInOrder } from './book.membership.js';
 import { BookModel } from './book.model.js';
 import { toTextSearchWords } from '../../shared/text.js';
@@ -274,4 +279,32 @@ export async function findPossibleDuplicateBooks(
         : []),
     ],
   }));
+}
+
+export interface BookIdentity {
+  bookId: string;
+  format: BookFormat;
+}
+
+/** Id and format of every active book of the owner, for counts; no other book field is read. */
+export async function listActiveBookIdentities(ownerId: string): Promise<BookIdentity[]> {
+  const books = await BookModel.find(activeBooksOwnedBy(ownerId)).select({ format: 1 }).lean();
+  return books.map((book) => ({ bookId: book._id.toHexString(), format: book.format }));
+}
+
+export interface RecentlyAddedBook {
+  bookId: string;
+  createdAt: Date;
+}
+
+export async function listRecentlyAddedBooks(
+  ownerId: string,
+  limit: number,
+): Promise<RecentlyAddedBook[]> {
+  const books = await BookModel.find(activeBooksOwnedBy(ownerId))
+    .sort(SORT_ORDERS.recent)
+    .limit(limit)
+    .select({ createdAt: 1 })
+    .lean();
+  return books.map((book) => ({ bookId: book._id.toHexString(), createdAt: book.createdAt }));
 }

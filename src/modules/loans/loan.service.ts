@@ -1,5 +1,6 @@
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { utcCalendarDateOf } from '../../shared/calendar-date.js';
 import { AppError } from '../../shared/errors.js';
 import { invalidFieldsError } from '../../shared/request-validation.js';
 import { requireVisibleCopyBookIdOwnedByUser } from '../copies/copy.service.js';
@@ -9,7 +10,6 @@ import {
   loanStatusFilter,
   problemsWithLoanDates,
   problemWithReturnDateCorrection,
-  utcCalendarDateOf,
 } from './loan.rules.js';
 import type { LoanChanges, LoanListQuery, LoanReturn, NewLoan } from './loan.schema.js';
 
@@ -222,4 +222,43 @@ export async function returnLoanOwnedByUser(
     if (returnedLoan) return toPublicLoan(returnedLoan);
   }
   throw loanUpdateConflictError();
+}
+
+export interface LoanCounts {
+  active: number;
+  overdue: number;
+  returned: number;
+}
+
+/** All of the owner's loans by status, including loans whose copy or book was deleted. */
+export async function countLoansOwnedByUser(ownerId: string, asOf: string): Promise<LoanCounts> {
+  const [active, overdue, returned] = await Promise.all(
+    (['active', 'overdue', 'returned'] as const).map((status) =>
+      LoanModel.countDocuments({ ownerId, ...loanStatusFilter(status, asOf) }),
+    ),
+  );
+  return { active: active ?? 0, overdue: overdue ?? 0, returned: returned ?? 0 };
+}
+
+export interface RecentlyRecordedLoan {
+  loanId: string;
+  bookId: string;
+  createdAt: Date;
+}
+
+/** The newest loans of the owner, deliberately including those of deleted copies and books. */
+export async function listRecentlyRecordedLoans(
+  ownerId: string,
+  limit: number,
+): Promise<RecentlyRecordedLoan[]> {
+  const loans = await LoanModel.find({ ownerId })
+    .sort(SORT_ORDERS.recent)
+    .limit(limit)
+    .select({ bookId: 1, createdAt: 1 })
+    .lean();
+  return loans.map((loan) => ({
+    loanId: loan._id.toHexString(),
+    bookId: loan.bookId.toHexString(),
+    createdAt: loan.createdAt,
+  }));
 }

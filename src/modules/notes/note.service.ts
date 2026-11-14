@@ -12,7 +12,13 @@ import { requireBookIdOfVisibleReadingSession } from '../reading/reading.service
 import { toPublicNote, type NoteDto } from './note.dto.js';
 import { NoteModel, type NoteRecord } from './note.model.js';
 import { problemsWithContentLength, toChapterKey } from './note.rules.js';
-import type { AllNotesQuery, BookNotesQuery, NewNote, NoteChanges } from './note.schema.js';
+import type {
+  AllNotesQuery,
+  BookNotesQuery,
+  NewNote,
+  NoteChanges,
+  NoteKind,
+} from './note.schema.js';
 
 const NOTE_ORDERS = {
   recent: { createdAt: -1, _id: -1 },
@@ -221,4 +227,53 @@ export async function deleteNoteOwnedByUser(ownerId: string, noteId: string): Pr
     $set: { deletedAt: new Date() },
   });
   if (matchedCount === 0) throw noteNotFoundError();
+}
+
+export interface NoteCounts {
+  notes: number;
+  highlights: number;
+}
+
+/** Non-deleted notes and highlights of the owner's active books. */
+export async function countVisibleNotesByKind(ownerId: string): Promise<NoteCounts> {
+  const counts = await NoteModel.aggregate<{ _id: NoteKind; count: number }>([
+    { $match: activeNotesOwnedBy(ownerId) },
+    { $group: { _id: { bookId: '$bookId', kind: '$kind' }, count: { $sum: 1 } } },
+    ...keepDocumentsOfActiveBooks(ownerId, '_id.bookId'),
+    { $group: { _id: '$_id.kind', count: { $sum: '$count' } } },
+  ]);
+  const countOf = (kind: NoteKind) => counts.find((row) => row._id === kind)?.count ?? 0;
+  return { notes: countOf('note'), highlights: countOf('highlight') };
+}
+
+export interface RecentlyAddedNote {
+  noteId: string;
+  bookId: string;
+  kind: NoteKind;
+  createdAt: Date;
+}
+
+/** The newest notes of active books; hidden books are filtered out before the limit applies. */
+export async function listRecentlyAddedNotes(
+  ownerId: string,
+  limit: number,
+): Promise<RecentlyAddedNote[]> {
+  const notes = await NoteModel.aggregate<{
+    _id: mongoose.Types.ObjectId;
+    bookId: mongoose.Types.ObjectId;
+    kind: NoteKind;
+    createdAt: Date;
+  }>([
+    { $match: activeNotesOwnedBy(ownerId) },
+    { $sort: NOTE_ORDERS.recent },
+    ...keepDocumentsOfActiveBooks(ownerId, 'bookId'),
+    { $limit: limit },
+    { $project: { bookId: 1, kind: 1, createdAt: 1 } },
+  ]);
+  return notes.map(({ _id, bookId, kind, createdAt }) => ({
+    noteId: _id.toHexString(),
+    bookId: bookId.toHexString(),
+    kind,
+    createdAt,
+  }));
 }
