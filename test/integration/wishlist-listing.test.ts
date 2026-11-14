@@ -96,7 +96,7 @@ describe('GET /api/v1/wishlist', () => {
     for (let index = 0; index < 4; index += 1) {
       ids.push((await addWish(reader, { title: 'Same', priority: 'high' })).id);
     }
-    await WishlistItemModel.updateMany({}, { $set: { createdAt: SAME_INSTANT } });
+    await WishlistItemModel.collection.updateMany({}, { $set: { createdAt: SAME_INSTANT } });
     const ascending = [...ids].sort();
 
     expect(idsOf(await reader.wishlist.list())).toEqual([...ascending].reverse());
