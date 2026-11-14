@@ -1,0 +1,22 @@
+meta {
+  name: Add book to collection again
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/collections/{{collectionsGroupId}}/books/{{collectionsBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("is idempotent: 204 again, the book is stored once", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}

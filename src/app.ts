@@ -10,9 +10,12 @@ import { createAuthenticationMiddleware } from './modules/auth/auth.middleware.j
 import { DEFAULT_AUTH_RATE_LIMITS, type AuthRateLimits } from './modules/auth/auth.rate-limits.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createBooksRouter } from './modules/books/book.routes.js';
+import { createCategoriesRouter } from './modules/categories/category.routes.js';
+import { createCollectionsRouter } from './modules/collections/collection.routes.js';
 import { createCopiesRouter } from './modules/copies/copy.routes.js';
 import { createLocationsRouter } from './modules/locations/location.routes.js';
 import { createNotesRouter } from './modules/notes/note.routes.js';
+import { createOrganizationRouter } from './modules/organization/organization.routes.js';
 import { createReadingRouter } from './modules/reading/reading.routes.js';
 import { healthRouter } from './modules/health/health.routes.js';
 
@@ -25,6 +28,8 @@ const PRIVATE_DATA_PATHS = [
   '/locations',
   '/reading-sessions',
   '/notes',
+  '/categories',
+  '/collections',
 ].map((path) => `${API_PREFIX}${path}`);
 export const JSON_BODY_LIMIT = '100kb';
 
@@ -74,8 +79,11 @@ export function createApp({
   api.use(createCopiesRouter({ requireAuthenticatedUser }));
   api.use(createReadingRouter({ requireAuthenticatedUser }));
   api.use(createNotesRouter({ requireAuthenticatedUser }));
+  api.use(createOrganizationRouter({ requireAuthenticatedUser }));
   api.use('/books', createBooksRouter({ requireAuthenticatedUser }));
   api.use('/locations', createLocationsRouter({ requireAuthenticatedUser }));
+  api.use('/categories', createCategoriesRouter({ requireAuthenticatedUser }));
+  api.use('/collections', createCollectionsRouter({ requireAuthenticatedUser }));
   app.use(API_PREFIX, api);
 
   app.use(notFoundHandler);

@@ -3,9 +3,12 @@ import request, { type Test } from 'supertest';
 import { expect } from 'vitest';
 import type { PaginationMeta } from '../../src/shared/api-response.js';
 import type { BookDto } from '../../src/modules/books/book.dto.js';
+import type { CategoryDto } from '../../src/modules/categories/category.dto.js';
+import type { BookCollectionDto } from '../../src/modules/collections/collection.dto.js';
 import type { PhysicalCopyDto } from '../../src/modules/copies/copy.dto.js';
 import type { StorageLocationDto } from '../../src/modules/locations/location.dto.js';
 import type { NoteDto } from '../../src/modules/notes/note.dto.js';
+import type { BookOrganizationDto } from '../../src/modules/organization/organization.dto.js';
 import type {
   BookReadingOverviewDto,
   ReadingSessionDto,
@@ -90,6 +93,30 @@ export function notesApiFor(app: Express, accessToken: string) {
   };
 }
 
+/** Categories and collections share one API shape, so tests can run against both. */
+export function groupsApiFor(app: Express, accessToken: string, rootPath: string) {
+  const authorized = authorizedWith(accessToken);
+  const root = `/api/v1/${rootPath}`;
+  return {
+    rootPath,
+    create: (group: object) => authorized(request(app).post(root)).send(group),
+    list: (query: Record<string, string> | string = {}) =>
+      authorized(request(app).get(root)).query(query),
+    get: (groupId: string) => authorized(request(app).get(`${root}/${groupId}`)),
+    update: (groupId: string, changes: object) =>
+      authorized(request(app).patch(`${root}/${groupId}`)).send(changes),
+    remove: (groupId: string) => authorized(request(app).delete(`${root}/${groupId}`)),
+    addBook: (groupId: string, bookId: string) =>
+      authorized(request(app).put(`${root}/${groupId}/books/${bookId}`)),
+    removeBook: (groupId: string, bookId: string) =>
+      authorized(request(app).delete(`${root}/${groupId}/books/${bookId}`)),
+    listBooks: (groupId: string, query: Record<string, string> | string = {}) =>
+      authorized(request(app).get(`${root}/${groupId}/books`)).query(query),
+  };
+}
+
+export type GroupsApi = ReturnType<typeof groupsApiFor>;
+
 export async function signInLibraryReader(app: Express) {
   const { user, tokens } = await registerReader(app);
   return {
@@ -100,6 +127,12 @@ export async function signInLibraryReader(app: Express) {
     copies: copiesApiFor(app, tokens.accessToken),
     reading: readingApiFor(app, tokens.accessToken),
     notes: notesApiFor(app, tokens.accessToken),
+    categories: groupsApiFor(app, tokens.accessToken, 'categories'),
+    collections: groupsApiFor(app, tokens.accessToken, 'collections'),
+    presets: () =>
+      authorizedWith(tokens.accessToken)(request(app).get('/api/v1/categories/presets')),
+    organizationOf: (bookId: string) =>
+      authorizedWith(tokens.accessToken)(request(app).get(`/api/v1/books/${bookId}/organization`)),
   };
 }
 
@@ -120,6 +153,12 @@ export const overviewFrom = (res: { body: unknown }) => dataFrom<BookReadingOver
 
 export const noteFrom = (res: { body: unknown }) => dataFrom<NoteDto>(res);
 export const notesFrom = (res: { body: unknown }) => dataFrom<NoteDto[]>(res);
+
+export type GroupDto = CategoryDto | BookCollectionDto;
+export const groupFrom = (res: { body: unknown }) => dataFrom<GroupDto>(res);
+export const groupsFrom = (res: { body: unknown }) => dataFrom<GroupDto[]>(res);
+export const booksFrom = (res: { body: unknown }) => dataFrom<BookDto[]>(res);
+export const organizationFrom = (res: { body: unknown }) => dataFrom<BookOrganizationDto>(res);
 
 export function paginationOf(res: { body: unknown }): PaginationMeta {
   return (res.body as { meta: { pagination: PaginationMeta } }).meta.pagination;
@@ -192,3 +231,21 @@ export function addNote(
 ) {
   return expectCreated<NoteDto>(reader.notes.create(bookId, note));
 }
+
+export function addGroup(groups: GroupsApi, name: string, description?: string) {
+  return expectCreated<GroupDto>(
+    groups.create({ name, ...(description !== undefined && { description }) }),
+  );
+}
+
+export async function putBookInGroup(groups: GroupsApi, groupId: string, bookId: string) {
+  const res = await groups.addBook(groupId, bookId);
+  expect(res.status).toBe(204);
+}
+
+/** The two group kinds, for tests that must hold for both. */
+export const GROUP_KINDS = [
+  ['category', 'categories', 'Category not found'],
+  ['collection', 'collections', 'Collection not found'],
+] as const;
+export type GroupKind = (typeof GROUP_KINDS)[number][1];

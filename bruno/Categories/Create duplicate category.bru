@@ -1,0 +1,36 @@
+meta {
+  name: Create duplicate category
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/categories
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+body:json {
+  {
+    "name": " philosophy "
+  }
+}
+
+tests {
+  test("returns 409 CONFLICT without database details", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error).to.eql({
+      code: "CONFLICT",
+      message: "A category with this name already exists",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}
+
+docs {
+  The name differs only in case and spacing, so the unique index rejects it.
+}

@@ -1,0 +1,30 @@
+meta {
+  name: Add book to collection
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/collections/{{collectionsGroupId}}/books/{{collectionsBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("adds the book and returns 204 with no body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # PUT /api/v1/collections/:collectionId/books/:bookId
+
+  Idempotent: 204 whether the book was newly added or already a member. Both the collection
+  and the book must be active and the reader's own; otherwise `404` ("Book not found" is
+  checked first, then "Collection not found"). Membership order is the order of first addition.
+}

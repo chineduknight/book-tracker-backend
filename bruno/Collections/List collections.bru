@@ -1,0 +1,35 @@
+meta {
+  name: List collections
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/collections?limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  limit: 20
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("lists the reader's collections alphabetically", function () {
+    expect(res.getStatus()).to.equal(200);
+    const names = res.getBody().data.map((group) => group.name);
+    expect(names).to.eql(["My Favourites", "To Read in 2027"]);
+    expect(res.getBody().meta.pagination).to.eql({ page: 1, limit: 20, total: 2, totalPages: 1 });
+  });
+}
+
+docs {
+  # GET /api/v1/collections
+
+  Query: `page` (default 1) and `limit` (1–100, default 20), each at most once. Ordered by the
+  case-insensitive name, then id. Deleted collections are never listed.
+}

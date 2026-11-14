@@ -257,3 +257,40 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
   the copy and reading policies; there are no transactions.
 - **Requested filters must exist.** A missing, deleted or foreign `bookId` or `readingSessionId`
   filter returns `404` rather than an empty page, consistent with book-scoped endpoints.
+
+## Organization decisions
+
+- **Categories classify, collections curate.** A category describes what a book is
+  (`Philosophy`); a collection is a shelf the reader assembles (`To Read in 2027`). Both group
+  books, not copies, sessions or notes, and both are many-to-many. They behave identically and
+  are kept as two separate, mirrored modules rather than one `type` field or a generic framework,
+  so the product can let them diverge (for example nesting categories) without a migration.
+- **Starter categories are suggestions, not data.** `GET /categories/presets` returns a fixed
+  list; registration creates no categories, listing creates none, and a deleted category is never
+  resurrected by a suggestion. Only an explicit create materializes a category. This keeps account
+  data predictable and lets a reader ignore presets entirely.
+- **Membership lives in an ordered `bookIds` array on the group.** At the expected scale (a few
+  hundred books per reader) a bounded array with atomic `$addToSet`/`$pull` is simpler and safer
+  than a join collection: one document, no read-modify-save race, insertion order for free. Adding
+  an existing member does not move it; removing and re-adding appends. There is no reorder
+  endpoint yet. A separate membership collection becomes preferable if groups grow by orders of
+  magnitude or need per-membership data; `listActiveBooksInMembershipOrder` is the one place that
+  would change.
+- **Group DTOs carry no memberships and no counts.** A group's books come from its own books
+  endpoint, whose `total` counts visible books at request time; a cached `bookCount` would drift
+  when books are deleted.
+- **Names are unique per reader and kind among active groups**, by normalized name (whitespace
+  collapsed, NFC, lowercased) through a **partial unique index** on `deletedAt: null`. Deleting a
+  group frees its name while the old record stays. Verified on real MongoDB: a second active
+  namesake is refused, several deleted namesakes coexist, and the index serves the lookup.
+- **Group deletion is soft and never cascades** (invariant 7): the group and its memberships are
+  hidden, books and everything attached to them are untouched. Deleting a book hides it from its
+  groups; the membership id may remain stored and is filtered out whenever the group's books are
+  read, before counting and paging.
+- **Membership writes check the book, then update the group atomically.** The book check is a
+  separate read, so a book deleted in between can leave a hidden membership; it is never shown.
+  A group deleted in between is never written to, because the update matches only active groups.
+  This is the same non-transactional policy as copies, reading sessions and notes.
+- **`updatedAt` of a group reflects its last change, memberships included.** Membership writes
+  use the normal Mongoose timestamps, so an idempotent no-op PUT also advances it; this is
+  accepted as simpler and more honest than hiding membership changes from `updatedAt`.

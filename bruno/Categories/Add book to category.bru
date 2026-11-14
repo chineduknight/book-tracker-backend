@@ -1,0 +1,30 @@
+meta {
+  name: Add book to category
+  type: http
+  seq: 9
+}
+
+put {
+  url: {{baseUrl}}/categories/{{categoriesGroupId}}/books/{{categoriesBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("adds the book and returns 204 with no body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # PUT /api/v1/categories/:categoryId/books/:bookId
+
+  Idempotent: 204 whether the book was newly added or already a member. Both the category
+  and the book must be active and the reader's own; otherwise `404` ("Book not found" is
+  checked first, then "Category not found"). Membership order is the order of first addition.
+}

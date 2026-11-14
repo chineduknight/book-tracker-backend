@@ -1,0 +1,32 @@
+meta {
+  name: Create categories physical book
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Meditations",
+    "format": "physical"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("categoriesBookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the first book to organize", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

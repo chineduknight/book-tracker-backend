@@ -1,0 +1,29 @@
+meta {
+  name: Remove book from collection
+  type: http
+  seq: 13
+}
+
+delete {
+  url: {{baseUrl}}/collections/{{collectionsGroupId}}/books/{{collectionsBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("removes the book and returns 204 with no body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # DELETE /api/v1/collections/:collectionId/books/:bookId
+
+  Idempotent: 204 even if the book was not a member. The collection and the book must still be
+  the reader's own and active, otherwise `404`. Re-adding a removed book appends it at the end.
+}

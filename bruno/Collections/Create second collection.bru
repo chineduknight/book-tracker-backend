@@ -1,0 +1,32 @@
+meta {
+  name: Create second collection
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/collections
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "My Favourites"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("collectionsSecondGroupId", res.getBody().data.id);
+}
+
+tests {
+  test("creates a second group without a description", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data).to.not.have.property("description");
+  });
+}

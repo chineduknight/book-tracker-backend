@@ -1,0 +1,22 @@
+meta {
+  name: Add book to category again
+  type: http
+  seq: 11
+}
+
+put {
+  url: {{baseUrl}}/categories/{{categoriesGroupId}}/books/{{categoriesBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("is idempotent: 204 again, the book is stored once", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}

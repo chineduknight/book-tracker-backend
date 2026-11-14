@@ -1,0 +1,38 @@
+meta {
+  name: Rename category
+  type: http
+  seq: 16
+}
+
+patch {
+  url: {{baseUrl}}/categories/{{categoriesGroupId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+body:json {
+  {
+    "name": "Ancient Philosophy",
+    "description": null
+  }
+}
+
+tests {
+  test("renames and clears the description", function () {
+    expect(res.getStatus()).to.equal(200);
+    const group = res.getBody().data;
+    expect(group.name).to.equal("Ancient Philosophy");
+    expect(group).to.not.have.property("description");
+  });
+}
+
+docs {
+  # PATCH /api/v1/categories/:categoryId
+
+  `name` and/or `description`; at least one. `null` clears the description. Renaming to
+  another active category's name returns `409 CONFLICT`; a case-only rename keeps the new casing.
+}

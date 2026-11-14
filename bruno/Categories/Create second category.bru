@@ -1,0 +1,32 @@
+meta {
+  name: Create second category
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{baseUrl}}/categories
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+body:json {
+  {
+    "name": "Biography"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("categoriesSecondGroupId", res.getBody().data.id);
+}
+
+tests {
+  test("creates a second group without a description", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data).to.not.have.property("description");
+  });
+}

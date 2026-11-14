@@ -1,0 +1,29 @@
+meta {
+  name: Remove book from category
+  type: http
+  seq: 14
+}
+
+delete {
+  url: {{baseUrl}}/categories/{{categoriesGroupId}}/books/{{categoriesBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("removes the book and returns 204 with no body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # DELETE /api/v1/categories/:categoryId/books/:bookId
+
+  Idempotent: 204 even if the book was not a member. The category and the book must still be
+  the reader's own and active, otherwise `404`. Re-adding a removed book appends it at the end.
+}

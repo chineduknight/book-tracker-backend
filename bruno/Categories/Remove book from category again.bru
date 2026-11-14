@@ -1,0 +1,22 @@
+meta {
+  name: Remove book from category again
+  type: http
+  seq: 15
+}
+
+delete {
+  url: {{baseUrl}}/categories/{{categoriesGroupId}}/books/{{categoriesBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("is idempotent: 204 for a book that is no longer a member", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
