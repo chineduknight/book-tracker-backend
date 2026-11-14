@@ -15,7 +15,15 @@ bruno/
 ├── Books/                  # catalogue create, duplicate check, list/search, get, update, delete
 ├── Locations/              # storage locations: create, duplicate, list, get, rename
 ├── Copies/                 # physical copies: create, ebook/format conflicts, list, update, delete
-└── Reading/                # reading sessions: start, progress, finish, reread, history, overview
+├── Reading/                # reading sessions: start, progress, finish, reread, history, overview
+├── Notes/                  # notes and highlights: create, session links, search, update, delete
+├── Categories/             # categories: presets, create, memberships, book organization
+├── Collections/            # collections: create, memberships, ordered books
+├── Wishlist/               # wishes: create, filters, acquisition, delete
+├── Loans/                  # loans: lend, overview, history, overdue, return, corrections
+├── Dashboard/              # derived summary, reading statistics, recent activity
+├── Export/                 # JSON archive, CSV files and Markdown notes
+└── Security/               # cross-reader isolation: foreign ids, owner fields, forged tokens
 ```
 
 ## Use the desktop app
@@ -61,6 +69,14 @@ soft-deleted ebook, and parses the CSV and Markdown downloads as text. The Dashb
 empty dashboard first, then builds a small library and asserts exact derived counts. None reuses the Auth folder's tokens, which that folder
 deliberately logs out, so each folder runs reliably on its own or as part of the whole collection.
 
+The **Security** folder registers two disposable readers, an owner (`securityOwnerToken`) with a
+private book, copy and active loan, and an intruder (`securityIntruderToken`). It checks that the
+intruder's attempts on the owner's ids answer exactly like missing records, that nothing of the
+owner's appears in the intruder's lists or export, that a request cannot name an owner, that a
+forged token is refused with a Bearer challenge, and that the owner's records are unchanged
+afterwards. The integration suite runs the same checks on every route; this folder is a
+representative, runnable sample.
+
 ## Repeatable runs: `npm run api:smoke`
 
 `npm run api:smoke` is the recommended way to run the whole collection repeatedly. It builds the
@@ -94,9 +110,9 @@ npm run api:smoke
 ```
 
 `npm run api:test` runs the collection against an API you started yourself (for example
-`npm run dev`). A full run makes fifteen registration attempts (three in Auth, one in each other
-folder), so against a long-running API only one full run fits in the hourly per-address
-registration limit; restart the API or use `api:smoke`.
+`npm run dev`). A full run makes sixteen registration attempts (three in Auth, two in Security, one
+in each other folder), so against a long-running API only one full run fits in the hourly
+per-address registration limit of 20; restart the API or use `api:smoke`.
 
 ## Secrets
 

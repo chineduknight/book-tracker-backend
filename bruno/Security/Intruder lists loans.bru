@@ -1,0 +1,24 @@
+meta {
+  name: Intruder lists loans
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/loans?status=all
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityIntruderToken}}
+}
+
+tests {
+  test("shows none of the owner's loans or borrower details", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data).to.eql([]);
+    expect(res.getBody().meta.pagination.total).to.equal(0);
+    expect(JSON.stringify(res.getBody())).to.not.include("Private Borrower");
+  });
+}

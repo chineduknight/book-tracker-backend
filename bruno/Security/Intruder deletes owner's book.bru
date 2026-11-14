@@ -1,0 +1,25 @@
+meta {
+  name: Intruder deletes owner's book
+  type: http
+  seq: 9
+}
+
+delete {
+  url: {{baseUrl}}/books/{{securityBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityIntruderToken}}
+}
+
+tests {
+  test("answers 404 exactly like a missing record", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody()).to.eql({
+      error: { code: "NOT_FOUND", message: "Book not found", requestId: res.getHeader("x-request-id") },
+    });
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}

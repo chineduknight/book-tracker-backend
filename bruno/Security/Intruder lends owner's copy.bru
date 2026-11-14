@@ -1,0 +1,32 @@
+meta {
+  name: Intruder lends owner's copy
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/copies/{{securityCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityIntruderToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Intruder",
+    "lentOn": "2026-11-14"
+  }
+}
+
+tests {
+  test("answers 404 exactly like a missing record", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody()).to.eql({
+      error: { code: "NOT_FOUND", message: "Copy not found", requestId: res.getHeader("x-request-id") },
+    });
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}

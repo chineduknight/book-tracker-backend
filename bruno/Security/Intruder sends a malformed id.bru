@@ -1,0 +1,24 @@
+meta {
+  name: Intruder sends a malformed id
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/books/not-an-id
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityIntruderToken}}
+}
+
+tests {
+  test("rejects the id syntax with 400 before any lookup", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([
+      { field: "bookId", message: "must be a 24-character hexadecimal id" },
+    ]);
+  });
+}

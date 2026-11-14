@@ -1,0 +1,46 @@
+meta {
+  name: Forged access token
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/auth/me
+  body: none
+  auth: none
+}
+
+script:pre-request {
+  // Built here rather than committed: a well-formed HS256 token whose signature this API never made.
+  const encode = (part) =>
+    btoa(JSON.stringify(part)).replace(/=+$/, "").replace(/\+/g, "-").replace(/\//g, "_");
+  const forged = [
+    encode({ alg: "HS256", typ: "at+jwt" }),
+    encode({
+      sub: "64b7f0c2a1b2c3d4e5f60718",
+      sid: "64b7f0c2a1b2c3d4e5f60718",
+      iss: "book-tracker-api",
+      aud: "book-tracker-api",
+      exp: Math.floor(Date.now() / 1000) + 600,
+    }),
+    encode("not-the-signature"),
+  ].join(".");
+  req.setHeader("Authorization", `Bearer ${forged}`);
+}
+
+tests {
+  test("sends a well-formed three-part token", function () {
+    expect(req.getHeader("Authorization")).to.match(/^Bearer [\w-]+\.[\w-]+\.[\w-]+$/);
+  });
+
+  test("refuses a token this API did not sign, with a Bearer challenge", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getHeader("www-authenticate")).to.equal("Bearer");
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+    expect(res.getBody().error.code).to.equal("UNAUTHENTICATED");
+  });
+}
+
+docs {
+  A well-formed HS256 token with a wrong signature, as an attacker could build one.
+}

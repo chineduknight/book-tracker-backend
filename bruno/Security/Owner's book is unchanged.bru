@@ -1,0 +1,23 @@
+meta {
+  name: Owner's book is unchanged
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/books/{{securityBookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityOwnerToken}}
+}
+
+tests {
+  test("still exists with its original title and description", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.title).to.equal("Security private book");
+    expect(res.getBody().data.description).to.equal("Only the owner may read this");
+  });
+}

@@ -1,0 +1,34 @@
+meta {
+  name: Intruder gets a missing book
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/books/64b7f0c2a1b2c3d4e5f60718
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityIntruderToken}}
+}
+
+script:post-response {
+  const { requestId, ...error } = res.getBody().error;
+  bru.setVar("securityMissingBookError", JSON.stringify(error));
+}
+
+tests {
+  test("answers 404 exactly like a missing record", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody()).to.eql({
+      error: { code: "NOT_FOUND", message: "Book not found", requestId: res.getHeader("x-request-id") },
+    });
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  The reference answer: an id that exists nowhere.
+}

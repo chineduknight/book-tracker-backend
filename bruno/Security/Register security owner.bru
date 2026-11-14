@@ -1,0 +1,38 @@
+meta {
+  name: Register security owner
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno Security Owner",
+    "email": "{{securityOwnerEmail}}",
+    "password": "{{securityOwnerPassword}}"
+  }
+}
+
+script:pre-request {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  bru.setVar("securityOwnerEmail", `bruno-security-owner-${runId}@example.test`);
+  bru.setVar("securityOwnerPassword", `disposable-${runId}`);
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("securityOwnerToken", res.getBody().data.tokens.accessToken);
+    bru.setVar("securityOwnerId", res.getBody().data.user.id);
+  }
+}
+
+tests {
+  test("creates the disposable owner used by this folder", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

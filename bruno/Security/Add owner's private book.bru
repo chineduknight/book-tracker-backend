@@ -1,0 +1,33 @@
+meta {
+  name: Add owner's private book
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityOwnerToken}}
+}
+
+body:json {
+  {
+    "title": "Security private book",
+    "format": "physical",
+    "description": "Only the owner may read this"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("securityBookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates the owner's book", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

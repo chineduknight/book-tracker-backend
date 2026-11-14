@@ -1,0 +1,31 @@
+meta {
+  name: Intruder returns owner's loan
+  type: http
+  seq: 12
+}
+
+put {
+  url: {{baseUrl}}/loans/{{securityLoanId}}/return
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityIntruderToken}}
+}
+
+body:json {
+  {
+    "returnedOn": "2026-11-14"
+  }
+}
+
+tests {
+  test("answers 404 exactly like a missing record", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody()).to.eql({
+      error: { code: "NOT_FOUND", message: "Loan not found", requestId: res.getHeader("x-request-id") },
+    });
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
