@@ -1,4 +1,5 @@
 import { formatSafeError } from '../../src/shared/safe-error.js';
+import { UnsafeDatabaseTargetError } from '../local-database-target.js';
 
 /** A failure described by the smoke runner itself; its message never contains input values. */
 export class SmokeRunError extends Error {
@@ -6,5 +7,8 @@ export class SmokeRunError extends Error {
 }
 
 export function describeSmokeFailure(error: unknown): string {
-  return error instanceof SmokeRunError ? error.message : formatSafeError(error);
+  if (error instanceof SmokeRunError || error instanceof UnsafeDatabaseTargetError) {
+    return error.message;
+  }
+  return formatSafeError(error);
 }

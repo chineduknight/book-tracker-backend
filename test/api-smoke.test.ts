@@ -4,6 +4,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ensurePortIsFree, waitUntilApiListens } from '../scripts/smoke/smoke-api-process.js';
+import { UnsafeDatabaseTargetError } from '../scripts/local-database-target.js';
 import { describeSmokeFailure, SmokeRunError } from '../scripts/smoke/smoke-errors.js';
 import { toLocalSmokeDatabaseUri, toSmokePort } from '../scripts/smoke/smoke-target.js';
 import { createCredentialError, expectNoCredentials } from './helpers.js';
@@ -95,7 +96,7 @@ describe('smoke database target', () => {
       failure = error;
     }
 
-    expect(failure).toBeInstanceOf(SmokeRunError);
+    expect(failure).toBeInstanceOf(UnsafeDatabaseTargetError);
     expect(describeSmokeFailure(failure)).not.toContain('hunter2');
     expect(describeSmokeFailure(failure)).not.toContain('example.test');
   });
