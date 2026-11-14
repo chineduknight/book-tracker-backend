@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { closingWhenDone } from '../../shared/archive-cursor.js';
 import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { invalidFieldsError } from '../../shared/request-validation.js';
@@ -281,7 +282,9 @@ export async function listRecentlyAddedNotes(
 
 /** Every note of the owner, deleted ones and those of deleted books included, oldest first. */
 export async function* streamNotesForArchive(ownerId: string): AsyncGenerator<NoteExportDto> {
-  for await (const note of NoteModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor()) {
+  for await (const note of closingWhenDone(
+    NoteModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor(),
+  )) {
     yield toArchivedNote(note);
   }
 }

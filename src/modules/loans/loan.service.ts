@@ -1,5 +1,6 @@
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { closingWhenDone } from '../../shared/archive-cursor.js';
 import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { utcCalendarDateOf } from '../../shared/calendar-date.js';
 import { AppError } from '../../shared/errors.js';
@@ -266,7 +267,9 @@ export async function listRecentlyRecordedLoans(
 
 /** Every loan of the owner, including loans of deleted copies and books, oldest first. */
 export async function* streamLoansForArchive(ownerId: string): AsyncGenerator<LoanDto> {
-  for await (const loan of LoanModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor()) {
+  for await (const loan of closingWhenDone(
+    LoanModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor(),
+  )) {
     yield toPublicLoan(loan);
   }
 }

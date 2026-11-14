@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { closingWhenDone } from '../../shared/archive-cursor.js';
 import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { toTextSearchWords } from '../../shared/text.js';
@@ -209,10 +210,9 @@ export async function listRecentlyAddedWishlistItems(
 export async function* streamWishlistItemsForArchive(
   ownerId: string,
 ): AsyncGenerator<WishlistItemExportDto> {
-  for await (const item of WishlistItemModel.find({ ownerId })
-    .sort(ARCHIVE_ORDER)
-    .lean()
-    .cursor()) {
+  for await (const item of closingWhenDone(
+    WishlistItemModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor(),
+  )) {
     yield toArchivedWishlistItem(item);
   }
 }

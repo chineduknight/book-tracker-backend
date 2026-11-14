@@ -1,9 +1,17 @@
+import mongoose from 'mongoose';
 import { describe, expect, it } from 'vitest';
 import type { ExportLimits } from '../../src/modules/export/export.limits.js';
 import { EXPORT_LIMITS } from '../../src/modules/export/export.limits.js';
 import { createAuthTestApp } from './auth-fixtures.js';
 import { addRichLibrary } from './export-fixtures.js';
-import { addNote, addPhysicalBook, signInLibraryReader } from './library-fixtures.js';
+import {
+  addNote,
+  addPhysicalBook,
+  signInLibraryReader,
+  type LibraryReader,
+} from './library-fixtures.js';
+import { TEST_DATABASE_NAME } from './test-database.js';
+import { PERSONAL_LIBRARY, seedLibrary } from './scale-fixtures.js';
 
 const RICH_LIBRARY_RECORDS = 16;
 
@@ -25,6 +33,34 @@ function expectTooLarge(res: { status: number; headers: Record<string, string>; 
     },
   });
 }
+
+/** Ids of server-side cursors on the test database that are open but not being read. */
+async function idleCursorIdsOfTestDatabase(): Promise<Set<string>> {
+  const idleCursors = await mongoose.connection
+    .getClient()
+    .db('admin')
+    .aggregate<{ cursor: { cursorId: unknown } }>([
+      { $currentOp: { idleCursors: true, allUsers: true } },
+      { $match: { type: 'idleCursor', ns: { $regex: `^${TEST_DATABASE_NAME}\\.` } } },
+    ])
+    .toArray();
+  return new Set(idleCursors.map(({ cursor }) => String(cursor.cursorId)));
+}
+
+/** Cursors that `run` leaves open; cursors left by earlier processes are ignored. */
+async function cursorsLeftOpenBy(run: () => Promise<unknown>): Promise<string[]> {
+  const before = await idleCursorIdsOfTestDatabase();
+  await run();
+  return [...(await idleCursorIdsOfTestDatabase())].filter((cursorId) => !before.has(cursorId));
+}
+
+const DOWNLOADS: [string, (reader: LibraryReader) => PromiseLike<{ status: number }>][] = [
+  ['archive', (reader) => reader.exports.archive()],
+  ['books.csv', (reader) => reader.exports.booksCsv()],
+  ['reading-sessions.csv', (reader) => reader.exports.readingSessionsCsv()],
+  ['loans.csv', (reader) => reader.exports.loansCsv()],
+  ['notes.md', (reader) => reader.exports.notesMarkdown()],
+];
 
 describe('export size limits', () => {
   it('allows exactly the record limit and refuses one record more, without any partial download', async () => {
@@ -70,6 +106,37 @@ describe('export size limits', () => {
     expectTooLarge(await reader.exports.notesMarkdown());
     expect((await reader.exports.loansCsv()).status).toBe(200);
     expect((await reader.exports.readingSessionsCsv()).status).toBe(200);
+  });
+
+  /*
+   * The limit is reached inside the first batch of a section with more records than one batch, so
+   * the server cursor is still open when the download stops. It must be closed, not left to the
+   * server's ten-minute idle timeout.
+   */
+  it.each(DOWNLOADS)(
+    'closes the database cursor when %s stops at a limit',
+    async (_file, download) => {
+      const reader = await signInWithLimits({ ...EXPORT_LIMITS, maxRecords: 50 });
+      await seedLibrary(reader.userId, PERSONAL_LIBRARY);
+
+      const leftOpen = await cursorsLeftOpenBy(async () => {
+        expect((await download(reader)).status).toBe(413);
+      });
+
+      expect(leftOpen).toEqual([]);
+    },
+  );
+
+  it('detects a cursor left open, so the closing test can fail', async () => {
+    const reader = await signInWithLimits(EXPORT_LIMITS);
+    await seedLibrary(reader.userId, PERSONAL_LIBRARY);
+    const cursor = mongoose.connection.collection('notes').find().batchSize(10);
+
+    try {
+      expect(await cursorsLeftOpenBy(() => cursor.next())).toHaveLength(1);
+    } finally {
+      await cursor.close();
+    }
   });
 
   it('documents the V1 limits', () => {
