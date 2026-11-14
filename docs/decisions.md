@@ -91,6 +91,14 @@ Details and exact responses are in the [API contract](api-contract.md#authentica
   keeps its own counters, so effective limits multiply; move to a shared store before scaling
   out. Behind a reverse proxy, configure Express `trust proxy` or every client shares one
   address bucket.
+- **`trust proxy` stays off until the hosting network is known (PR #14).** The limiters key on the
+  socket address, so forged `X-Forwarded-For`, `Forwarded` or `X-Real-IP` headers cannot open new
+  buckets (tested). express-rate-limit's own diagnostics, such as its one-time warning that
+  `X-Forwarded-For` arrives while `trust proxy` is off, go through the application logger and its
+  safe `err` serializer (name and code only), never to the console with a stack. That warning is
+  the signal PR #14 must act on: set `trust proxy` to the exact proxy hop count or addresses of the
+  chosen host, never `true`, and verify with a request through the real proxy that the logged
+  client address is the caller's.
 
 ## Book catalogue decisions
 
@@ -207,6 +215,14 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
   A local address is not proof that the database is disposable: an SSH tunnel or port forward on
   `localhost` can reach a remote server. Run the smoke command only against a MongoDB you know is
   a throwaway local instance (as in CI); the runner cannot detect a tunnel.
+- **The destructive integration suite has the same guard.** `npm run test:integration` deletes every
+  document of its database before each test. Until PR #13 it accepted any `MONGODB_TEST_URI` and
+  relied on the `dbName: 'book-tracker-test'` override, so a remote URI (or one naming another
+  database) would still have been cleaned. Both tools now validate their URI with
+  `scripts/local-database-target.ts` before any connection, index build or delete: one local host,
+  exactly their own database (`book-tracker-test` or `book-tracker-smoke`, kept distinct so a run
+  of one can never reset the other), allowlisted options and `directConnection=true`. Refusals
+  name only the variable and the rule. The tunnel limitation above applies to both.
 
 ## Notes decisions
 
@@ -417,6 +433,11 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
 - **No snapshot, no writes, no import.** Sections are read one after another without transactions,
   so a download can reflect changes made while it was assembled. Exporting never writes or repairs
   data. Import and restore are separate future work.
+- **Every archive cursor is closed, also when a download stops early.** A Mongoose cursor's async
+  iterator has no `return()`, so a `for await` that exits at a limit left the server-side cursor
+  (and, for sections sorted in memory, its sorted result) open until MongoDB's ten-minute idle
+  timeout. Archive reads go through the shared `closingWhenDone`, which closes the cursor in
+  `finally` (found and fixed in PR #13, tested by counting idle cursors on the server).
 - **Tie-break tests write through the driver.** Mongoose treats `createdAt` as immutable and
   silently drops it from model updates, so tests that force identical creation times update the
   raw collection (`Model.collection.updateMany`).

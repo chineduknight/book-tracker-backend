@@ -43,6 +43,11 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   history (`refreshtokens` collection), token issuance and
   the `requireAuthenticatedUser` middleware. `app.ts` creates the middleware once and passes it
   to every router that needs it.
+- Every `401 UNAUTHENTICATED` goes through `rejectAsUnauthenticated(res)` (auth middleware), which
+  adds the `WWW-Authenticate: Bearer` challenge: the middleware, `GET /auth/me` for a deleted
+  account and the export account check.
+- The auth rate limiters receive the application logger, so express-rate-limit's diagnostics are
+  logged through the safe `err` serializer instead of the console.
 - **Guarantee of `requireAuthenticatedUser`:** after it runs, `authenticatedUserOf(req)` returns
   a `userId` and `sessionId` taken from an HS256 access token this API signed (issuer, audience,
   type and expiry checked) whose session was active at that moment. It does not prove the user
@@ -261,7 +266,8 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   `streamCollectionsForArchive`, `streamWishlistItemsForArchive`, `streamLoansForArchive`, plus
   `streamBookTitlesForArchive` (for Markdown labels) and the users service's `findUserById`.
 - Each archive read is an async generator over a Mongoose cursor on `{ ownerId }`, sorted by the
-  shared `ARCHIVE_ORDER` (`createdAt`, `_id` ascending). Unlike the normal lists it deliberately
+  shared `ARCHIVE_ORDER` (`createdAt`, `_id` ascending), and wrapped in `closingWhenDone`
+  (`shared/archive-cursor.ts`) so the server cursor is closed however the download ends. Unlike the normal lists it deliberately
   applies **no** `deletedAt: null` filter and **no** active-parent join, so soft-deleted records
   and records of deleted parents are archived. Each module maps rows with its own `toPublic*`
   serializer and adds only `deletedAt` (and `bookIds` for groups) through `toArchived*`.

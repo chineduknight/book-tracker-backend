@@ -31,6 +31,8 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high
 
   integration:
     name: MongoDB integration tests and Bruno smoke test
