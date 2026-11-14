@@ -13,6 +13,7 @@ import { createBooksRouter } from './modules/books/book.routes.js';
 import { createCategoriesRouter } from './modules/categories/category.routes.js';
 import { createCollectionsRouter } from './modules/collections/collection.routes.js';
 import { createCopiesRouter } from './modules/copies/copy.routes.js';
+import { createLoansRouter } from './modules/loans/loan.routes.js';
 import { createLocationsRouter } from './modules/locations/location.routes.js';
 import { createNotesRouter } from './modules/notes/note.routes.js';
 import { createOrganizationRouter } from './modules/organization/organization.routes.js';
@@ -32,6 +33,7 @@ const PRIVATE_DATA_PATHS = [
   '/categories',
   '/collections',
   '/wishlist',
+  '/loans',
 ].map((path) => `${API_PREFIX}${path}`);
 export const JSON_BODY_LIMIT = '100kb';
 
@@ -78,6 +80,7 @@ export function createApp({
     AUTH_PATH,
     createAuthRouter({ accessTokens, requireAuthenticatedUser, rateLimits: authRateLimits }),
   );
+  api.use(createLoansRouter({ requireAuthenticatedUser }));
   api.use(createCopiesRouter({ requireAuthenticatedUser }));
   api.use(createReadingRouter({ requireAuthenticatedUser }));
   api.use(createNotesRouter({ requireAuthenticatedUser }));
