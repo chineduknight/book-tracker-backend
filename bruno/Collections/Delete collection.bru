@@ -1,0 +1,29 @@
+meta {
+  name: Delete collection
+  type: http
+  seq: 18
+}
+
+delete {
+  url: {{baseUrl}}/collections/{{collectionsGroupId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("soft-deletes the group with 204 and no body", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}
+
+docs {
+  # DELETE /api/v1/collections/:collectionId
+
+  Soft deletion: the collection and its memberships are hidden everywhere, the stored record
+  stays, no book is touched, and the name becomes available again. Repeating returns 404.
+}

@@ -1,0 +1,54 @@
+meta {
+  name: Create collection
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/collections
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "  To Read in 2027  ",
+    "description": "Big ones first"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("collectionsGroupId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public BookCollectionDto", function () {
+    expect(res.getStatus()).to.equal(201);
+    const group = res.getBody().data;
+    expect(group).to.eql({
+      id: group.id,
+      name: "To Read in 2027",
+      description: "Big ones first",
+      createdAt: group.createdAt,
+      updatedAt: group.updatedAt,
+    });
+    expect(res.getHeader("location")).to.equal(`/api/v1/collections/${group.id}`);
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/collections
+
+  Creates a collection for the reader. `name` (required; whitespace collapsed, 1–100 characters)
+  is unique per reader among active collections, ignoring case, spacing and Unicode composition.
+  `description` (optional, trimmed, 1–500 characters). Memberships are never in the DTO.
+
+  **201 Created**, `Location: /api/v1/collections/{id}`
+
+  **Errors**: `400 VALIDATION_ERROR`, `401`, `409 CONFLICT`.
+}

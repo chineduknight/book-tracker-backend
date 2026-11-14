@@ -1,0 +1,54 @@
+meta {
+  name: Create category
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/categories
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+body:json {
+  {
+    "name": "  Philosophy  ",
+    "description": "Stoics and friends"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("categoriesGroupId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public CategoryDto", function () {
+    expect(res.getStatus()).to.equal(201);
+    const group = res.getBody().data;
+    expect(group).to.eql({
+      id: group.id,
+      name: "Philosophy",
+      description: "Stoics and friends",
+      createdAt: group.createdAt,
+      updatedAt: group.updatedAt,
+    });
+    expect(res.getHeader("location")).to.equal(`/api/v1/categories/${group.id}`);
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/categories
+
+  Creates a category for the reader. `name` (required; whitespace collapsed, 1–100 characters)
+  is unique per reader among active categories, ignoring case, spacing and Unicode composition.
+  `description` (optional, trimmed, 1–500 characters). Memberships are never in the DTO.
+
+  **201 Created**, `Location: /api/v1/categories/{id}`
+
+  **Errors**: `400 VALIDATION_ERROR`, `401`, `409 CONFLICT`.
+}

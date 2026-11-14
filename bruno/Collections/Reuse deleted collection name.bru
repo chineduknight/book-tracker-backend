@@ -1,0 +1,28 @@
+meta {
+  name: Reuse deleted collection name
+  type: http
+  seq: 20
+}
+
+post {
+  url: {{baseUrl}}/collections
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "To Read Next Year"
+  }
+}
+
+tests {
+  test("creates a new empty collection with the freed name", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.id).to.not.equal(bru.getVar("collectionsGroupId"));
+  });
+}

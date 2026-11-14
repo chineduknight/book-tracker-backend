@@ -1,0 +1,22 @@
+meta {
+  name: Add ebook to category
+  type: http
+  seq: 10
+}
+
+put {
+  url: {{baseUrl}}/categories/{{categoriesGroupId}}/books/{{categoriesEbookId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("adds the ebook with the same title", function () {
+    expect(res.getStatus()).to.equal(204);
+    expect(res.getBody() ?? "").to.equal("");
+  });
+}

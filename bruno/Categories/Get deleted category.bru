@@ -1,0 +1,26 @@
+meta {
+  name: Get deleted category
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/categories/{{categoriesGroupId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error).to.eql({
+      code: "NOT_FOUND",
+      message: "Category not found",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}

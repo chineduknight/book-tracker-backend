@@ -1,0 +1,36 @@
+meta {
+  name: Create duplicate collection
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/collections
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "to   read in 2027"
+  }
+}
+
+tests {
+  test("returns 409 CONFLICT without database details", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error).to.eql({
+      code: "CONFLICT",
+      message: "A collection with this name already exists",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}
+
+docs {
+  The name differs only in case and spacing, so the unique index rejects it.
+}

@@ -1,0 +1,33 @@
+meta {
+  name: List books in collection
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/collections/{{collectionsGroupId}}/books
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("lists the member books in membership order as full BookDtos", function () {
+    expect(res.getStatus()).to.equal(200);
+    const ids = res.getBody().data.map((book) => book.id);
+    expect(ids).to.eql([bru.getVar("collectionsBookId"), bru.getVar("collectionsEbookId")]);
+    expect(res.getBody().data[0].title).to.equal("Meditations");
+    expect(res.getBody().meta.pagination).to.eql({ page: 1, limit: 20, total: 2, totalPages: 1 });
+  });
+}
+
+docs {
+  # GET /api/v1/collections/:collectionId/books
+
+  Returns `BookDto` records in membership order (not creation or title order), paged with
+  `page` and `limit`. Deleted books are dropped before counting, so `total` and the pages only
+  reflect visible books.
+}

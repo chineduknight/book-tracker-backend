@@ -1,0 +1,33 @@
+meta {
+  name: List category presets
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/categories/presets
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("returns the fixed suggestion list", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.names).to.eql([
+      "Fiction", "Nonfiction", "Biography", "History", "Philosophy",
+      "Psychology", "Science", "Technology", "Religion", "Personal Development",
+    ]);
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # GET /api/v1/categories/presets
+
+  Read-only starter suggestions in a fixed order. Nothing is created: a reader gets a
+  category only by creating it explicitly, and this list never changes with the account.
+}

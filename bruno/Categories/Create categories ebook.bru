@@ -1,0 +1,36 @@
+meta {
+  name: Create categories ebook
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Meditations",
+    "format": "ebook"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("categoriesEbookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates a second book with the same title", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Two books may share a title; grouping always uses the book id, so both stay distinct members.
+}

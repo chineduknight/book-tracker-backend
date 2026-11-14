@@ -1,0 +1,33 @@
+meta {
+  name: Get book organization
+  type: http
+  seq: 12
+}
+
+get {
+  url: {{baseUrl}}/books/{{collectionsBookId}}/organization
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("lists the collections containing the book", function () {
+    expect(res.getStatus()).to.equal(200);
+    const organization = res.getBody().data;
+    expect(organization.bookId).to.equal(bru.getVar("collectionsBookId"));
+    expect(organization.collections.map((group) => group.id)).to.eql([bru.getVar("collectionsGroupId")]);
+    expect(organization.categories).to.eql([]);
+  });
+}
+
+docs {
+  # GET /api/v1/books/:bookId/organization
+
+  The reader's active categories and collections that contain the book, each alphabetical,
+  so a book page can draw its chips with one request. A missing, foreign or deleted book
+  returns `404 "Book not found"`.
+}

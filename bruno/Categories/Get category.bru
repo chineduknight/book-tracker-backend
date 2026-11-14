@@ -1,0 +1,23 @@
+meta {
+  name: Get category
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/categories/{{categoriesGroupId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("returns the category", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.id).to.equal(bru.getVar("categoriesGroupId"));
+    expect(res.getBody().data.name).to.equal("Ancient Philosophy");
+  });
+}

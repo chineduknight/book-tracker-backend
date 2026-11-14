@@ -1,0 +1,28 @@
+meta {
+  name: Reuse deleted category name
+  type: http
+  seq: 21
+}
+
+post {
+  url: {{baseUrl}}/categories
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+body:json {
+  {
+    "name": "Ancient Philosophy"
+  }
+}
+
+tests {
+  test("creates a new empty category with the freed name", function () {
+    expect(res.getStatus()).to.equal(201);
+    expect(res.getBody().data.id).to.not.equal(bru.getVar("categoriesGroupId"));
+  });
+}

@@ -1,0 +1,38 @@
+meta {
+  name: Rename collection
+  type: http
+  seq: 15
+}
+
+patch {
+  url: {{baseUrl}}/collections/{{collectionsGroupId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "To Read Next Year",
+    "description": null
+  }
+}
+
+tests {
+  test("renames and clears the description", function () {
+    expect(res.getStatus()).to.equal(200);
+    const group = res.getBody().data;
+    expect(group.name).to.equal("To Read Next Year");
+    expect(group).to.not.have.property("description");
+  });
+}
+
+docs {
+  # PATCH /api/v1/collections/:collectionId
+
+  `name` and/or `description`; at least one. `null` clears the description. Renaming to
+  another active collection's name returns `409 CONFLICT`; a case-only rename keeps the new casing.
+}

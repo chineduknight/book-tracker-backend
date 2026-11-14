@@ -1,0 +1,35 @@
+meta {
+  name: List categories
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/categories?limit=20
+  body: none
+  auth: bearer
+}
+
+params:query {
+  limit: 20
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+tests {
+  test("lists the reader's categories alphabetically", function () {
+    expect(res.getStatus()).to.equal(200);
+    const names = res.getBody().data.map((group) => group.name);
+    expect(names).to.eql(["Biography", "Philosophy"]);
+    expect(res.getBody().meta.pagination).to.eql({ page: 1, limit: 20, total: 2, totalPages: 1 });
+  });
+}
+
+docs {
+  # GET /api/v1/categories
+
+  Query: `page` (default 1) and `limit` (1–100, default 20), each at most once. Ordered by the
+  case-insensitive name, then id. Deleted categories are never listed.
+}

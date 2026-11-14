@@ -1,0 +1,28 @@
+meta {
+  name: Rename collection to taken name
+  type: http
+  seq: 16
+}
+
+patch {
+  url: {{baseUrl}}/collections/{{collectionsSecondGroupId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+body:json {
+  {
+    "name": "TO READ NEXT YEAR"
+  }
+}
+
+tests {
+  test("returns 409 CONFLICT", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error.code).to.equal("CONFLICT");
+  });
+}

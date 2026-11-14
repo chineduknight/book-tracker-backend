@@ -1,0 +1,26 @@
+meta {
+  name: Get deleted collection
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/collections/{{collectionsGroupId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error).to.eql({
+      code: "NOT_FOUND",
+      message: "Collection not found",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}

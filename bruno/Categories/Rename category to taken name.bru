@@ -1,0 +1,28 @@
+meta {
+  name: Rename category to taken name
+  type: http
+  seq: 17
+}
+
+patch {
+  url: {{baseUrl}}/categories/{{categoriesSecondGroupId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{categoriesAccessToken}}
+}
+
+body:json {
+  {
+    "name": "ANCIENT PHILOSOPHY"
+  }
+}
+
+tests {
+  test("returns 409 CONFLICT", function () {
+    expect(res.getStatus()).to.equal(409);
+    expect(res.getBody().error.code).to.equal("CONFLICT");
+  });
+}

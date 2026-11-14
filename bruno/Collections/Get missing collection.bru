@@ -1,0 +1,30 @@
+meta {
+  name: Get missing collection
+  type: http
+  seq: 22
+}
+
+get {
+  url: {{baseUrl}}/collections/64b7f0c2a1b2c3d4e5f60718
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("returns 404 NOT_FOUND", function () {
+    expect(res.getStatus()).to.equal(404);
+    expect(res.getBody().error).to.eql({
+      code: "NOT_FOUND",
+      message: "Collection not found",
+      requestId: res.getHeader("x-request-id"),
+    });
+  });
+}
+
+docs {
+  Another reader's collection and a deleted collection return exactly this response.
+}

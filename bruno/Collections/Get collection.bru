@@ -1,0 +1,23 @@
+meta {
+  name: Get collection
+  type: http
+  seq: 17
+}
+
+get {
+  url: {{baseUrl}}/collections/{{collectionsGroupId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{collectionsAccessToken}}
+}
+
+tests {
+  test("returns the collection", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.id).to.equal(bru.getVar("collectionsGroupId"));
+    expect(res.getBody().data.name).to.equal("To Read Next Year");
+  });
+}
