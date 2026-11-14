@@ -6,6 +6,7 @@ import { BookModel } from '../../src/modules/books/book.model.js';
 import { CategoryModel } from '../../src/modules/categories/category.model.js';
 import { BookCollectionModel } from '../../src/modules/collections/collection.model.js';
 import { PhysicalCopyModel } from '../../src/modules/copies/copy.model.js';
+import { LoanModel } from '../../src/modules/loans/loan.model.js';
 import { LocationModel } from '../../src/modules/locations/location.model.js';
 import { NoteModel } from '../../src/modules/notes/note.model.js';
 import { ReadingSessionModel } from '../../src/modules/reading/reading.model.js';
@@ -38,6 +39,7 @@ async function deleteAuthData(): Promise<void> {
     CategoryModel.deleteMany({}),
     BookCollectionModel.deleteMany({}),
     WishlistItemModel.deleteMany({}),
+    LoanModel.deleteMany({}),
   ]);
 }
 
@@ -58,6 +60,7 @@ beforeAll(async () => {
     CategoryModel.syncIndexes(),
     BookCollectionModel.syncIndexes(),
     WishlistItemModel.syncIndexes(),
+    LoanModel.syncIndexes(),
   ]);
 });
 
