@@ -1,6 +1,9 @@
 import { Router, type Request, type RequestHandler, type Response } from 'express';
 import { parseRequestQuery } from '../../shared/request-validation.js';
+import { unauthenticatedError } from '../auth/auth.errors.js';
 import { authenticatedUserOf } from '../auth/auth.middleware.js';
+import type { UserDto } from '../users/user.dto.js';
+import { findUserById } from '../users/user.service.js';
 import type { Download } from './export.dto.js';
 import type { ExportLimits } from './export.limits.js';
 import { exportQuerySchema } from './export.schema.js';
@@ -28,6 +31,17 @@ const DOWNLOADS: Record<string, DownloadBuilder> = {
   '/notes.md': buildNotesMarkdownDownload,
 };
 
+/*
+ * Authentication proves the session, not that the account still exists. Every download checks
+ * the account first, so a reader deleted while a session is still active receives nothing.
+ */
+async function exportingProfileOf(req: Request, res: Response): Promise<UserDto> {
+  const profile = await findUserById(authenticatedUserOf(req).userId);
+  if (profile) return profile;
+  res.set('WWW-Authenticate', 'Bearer');
+  throw unauthenticatedError();
+}
+
 function sendDownload(res: Response, { filename, contentType, body }: Download): void {
   res
     .status(200)
@@ -47,12 +61,9 @@ export function createExportRouter({
 
   for (const [path, buildDownload] of Object.entries(DOWNLOADS)) {
     exportRouter.get(path, async (req: Request, res) => {
+      const profile = await exportingProfileOf(req, res);
       parseRequestQuery(exportQuerySchema, req.query);
-      const download = await buildDownload({
-        ownerId: authenticatedUserOf(req).userId,
-        exportedAt: new Date(),
-        limits,
-      });
+      const download = await buildDownload({ profile, exportedAt: new Date(), limits });
       sendDownload(res, download);
     });
   }

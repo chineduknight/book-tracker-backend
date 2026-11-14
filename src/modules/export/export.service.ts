@@ -1,5 +1,4 @@
 import { utcCalendarDateOf } from '../../shared/calendar-date.js';
-import { unauthenticatedError } from '../auth/auth.errors.js';
 import {
   streamBooksForArchive,
   streamBookTitlesForArchive,
@@ -12,7 +11,7 @@ import { streamLoansForArchive } from '../loans/loan.service.js';
 import { streamLocationsForArchive } from '../locations/location.service.js';
 import { streamNotesForArchive } from '../notes/note.service.js';
 import { streamReadingSessionsForArchive } from '../reading/reading.service.js';
-import { findUserById } from '../users/user.service.js';
+import type { UserDto } from '../users/user.dto.js';
 import { streamWishlistItemsForArchive } from '../wishlist/wishlist.service.js';
 import { toCsvRecord } from './export.csv.js';
 import {
@@ -51,8 +50,9 @@ const ARCHIVE_SECTIONS: { [Section in ArchiveSection]: SectionReader<Section> } 
   loans: streamLoansForArchive,
 };
 
+/** One download for a reader whose account was confirmed to exist; `profile.id` is the owner. */
 export interface ExportRequest {
-  ownerId: string;
+  profile: UserDto;
   exportedAt: Date;
   limits: ExportLimits;
 }
@@ -92,13 +92,10 @@ async function buildCsv<Row>(
  * read one after another, so they are not one point-in-time snapshot.
  */
 export async function buildArchiveDownload({
-  ownerId,
+  profile,
   exportedAt,
   limits,
 }: ExportRequest): Promise<Download> {
-  const profile = await findUserById(ownerId);
-  if (!profile) throw unauthenticatedError();
-
   const writer = new BoundedExportWriter(limits);
   writer.write(
     `{"data":{"schemaVersion":${ARCHIVE_SCHEMA_VERSION},` +
@@ -107,7 +104,7 @@ export async function buildArchiveDownload({
   );
   for (const [section, readSection] of Object.entries(ARCHIVE_SECTIONS)) {
     writer.write(`,${JSON.stringify(section)}:`);
-    await writeJsonArray(writer, readSection(ownerId));
+    await writeJsonArray(writer, readSection(profile.id));
   }
   writer.write('}}');
 
@@ -119,10 +116,11 @@ export async function buildArchiveDownload({
 }
 
 export async function buildBooksCsvDownload({
-  ownerId,
+  profile,
   exportedAt,
   limits,
 }: ExportRequest): Promise<Download> {
+  const ownerId = profile.id;
   return {
     filename: filenameOf('books', exportedAt, 'csv'),
     contentType: CSV_TYPE,
@@ -131,10 +129,11 @@ export async function buildBooksCsvDownload({
 }
 
 export async function buildReadingSessionsCsvDownload({
-  ownerId,
+  profile,
   exportedAt,
   limits,
 }: ExportRequest): Promise<Download> {
+  const ownerId = profile.id;
   return {
     filename: filenameOf('reading-sessions', exportedAt, 'csv'),
     contentType: CSV_TYPE,
@@ -143,10 +142,11 @@ export async function buildReadingSessionsCsvDownload({
 }
 
 export async function buildLoansCsvDownload({
-  ownerId,
+  profile,
   exportedAt,
   limits,
 }: ExportRequest): Promise<Download> {
+  const ownerId = profile.id;
   return {
     filename: filenameOf('loans', exportedAt, 'csv'),
     contentType: CSV_TYPE,
@@ -159,10 +159,11 @@ export async function buildLoansCsvDownload({
  * not among them shows the book id instead. Titles count towards the record limit too.
  */
 export async function buildNotesMarkdownDownload({
-  ownerId,
+  profile,
   exportedAt,
   limits,
 }: ExportRequest): Promise<Download> {
+  const ownerId = profile.id;
   const writer = new BoundedExportWriter(limits);
   const booksById = new Map<string, ArchivedBookTitle>();
   for await (const book of streamBookTitlesForArchive(ownerId)) {

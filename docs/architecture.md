@@ -273,6 +273,10 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 - Each download reads only what it shows: books CSV reads books, loans CSV reads loans, sessions
   CSV reads sessions, notes Markdown reads notes and the reader's book titles, the archive reads
   the profile and all nine sections. The number of queries per download is constant.
+- Authentication proves the session, not that the account still exists, so the export router
+  resolves the reader's profile through the users service once per download, before reading
+  the query or any data, and answers `401` for a deleted account on every download. Builders
+  receive that profile; the archive reuses it rather than looking it up again.
 - The limits are injected through `createApp({ exportLimits })` so tests exercise them with small
   values; production uses `EXPORT_LIMITS`.
 

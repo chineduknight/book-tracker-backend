@@ -779,7 +779,7 @@ User-initiated downloads of the signed-in reader's own data. The **JSON archive 
 | `GET`  | `/api/v1/export/notes.md`             | `text/markdown; charset=utf-8`    | `book-tracker-notes-YYYY-MM-DD.md`             |
 
 - **Success:** `200` with `Content-Disposition: attachment; filename="..."` (server-generated, ASCII; the date is the UTC day of `exportedAt`), `Content-Length`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and `X-Request-Id`. CORS exposes `Content-Disposition` (with `X-Request-Id` and `Location`) to allowed origins, so a browser client can read the filename.
-- **Errors** use the normal JSON error envelope, never a file: `400 VALIDATION_ERROR` (query parameters), `401 UNAUTHENTICATED` (missing, invalid or revoked token, or the signed-in account no longer exists), `413 EXPORT_TOO_LARGE` (see limits), `500 INTERNAL_ERROR`. All send `no-store`, as do CORS preflight and body-parser errors.
+- **Errors** use the normal JSON error envelope, never a file: `400 VALIDATION_ERROR` (query parameters), `401 UNAUTHENTICATED` with `WWW-Authenticate: Bearer` (missing, invalid or revoked token, or the signed-in account no longer exists, checked by every download before any data is read), `413 EXPORT_TOO_LARGE` (see limits), `500 INTERNAL_ERROR`. All send `no-store`, as do CORS preflight and body-parser errors.
 - **All or nothing:** a download is assembled completely and checked against the limits **before** any header or byte is sent, so a client never receives a partial or truncated file.
 
 #### Archive (`GET /api/v1/export/archive`)

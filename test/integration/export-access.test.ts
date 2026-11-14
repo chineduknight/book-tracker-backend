@@ -124,15 +124,38 @@ describe('export authentication and query strictness', () => {
     }
   });
 
-  it('refuses the archive with 401 when the signed-in account no longer exists', async () => {
-    const reader = await signInLibraryReader(createAuthTestApp());
-    await UserModel.deleteMany({});
+  it.each(EXPORT_FILES)(
+    'refuses %s with a JSON 401 once the account is deleted, even with an active session',
+    async (file) => {
+      const app = createAuthTestApp();
+      const reader = await signInLibraryReader(app);
+      await addRichLibrary(reader);
+      await UserModel.deleteOne({ _id: reader.userId });
+      expect(await SessionModel.countDocuments({ userId: reader.userId, revokedAt: null })).toBe(1);
 
-    const res = await reader.exports.archive();
+      for (const query of ['', '?unknown=1']) {
+        const res = await request(app)
+          .get(`/api/v1/export/${file}${query}`)
+          .set('Authorization', bearer(reader.tokens.accessToken));
 
-    expect(res.status).toBe(401);
-    expect(res.body.error.code).toBe('UNAUTHENTICATED');
-  });
+        expect(res.status).toBe(401);
+        expect(res.headers['content-type']).toBe('application/json; charset=utf-8');
+        expect(res.headers['www-authenticate']).toBe('Bearer');
+        expect(res.headers['cache-control']).toBe('no-store');
+        expect(res.headers['content-disposition']).toBeUndefined();
+        expect(res.body).toEqual({
+          error: {
+            code: 'UNAUTHENTICATED',
+            message: 'A valid access token is required',
+            requestId: res.headers['x-request-id'],
+          },
+        });
+        for (const privateText of ['Society', 'Ada Okafor', 'Thoughts', 'Loved it']) {
+          expect(res.text).not.toContain(privateText);
+        }
+      }
+    },
+  );
 
   it.each(EXPORT_FILES)('rejects unknown and repeated query parameters on %s', async (file) => {
     const app = createAuthTestApp();
