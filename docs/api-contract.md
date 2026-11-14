@@ -7,7 +7,7 @@ This document defines shared HTTP behavior. Every implemented endpoint must addi
 - Base path: `/api/v1`.
 - JSON responses use `Content-Type: application/json`; `204 No Content` has no body.
 - All responses include an `X-Request-Id` header. Error responses also include `requestId` in the body if one was assigned.
-- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories`, `/api/v1/collections`, `/api/v1/wishlist` and `/api/v1/loans` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
+- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories`, `/api/v1/collections`, `/api/v1/wishlist`, `/api/v1/loans` and `/api/v1/dashboard` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
 - CORS exposes `X-Request-Id` and `Location` to allowed browser origins.
 - **Logging:** request logs contain the method, the URL path (which includes resource ids such as `/api/v1/books/{id}`), the status and the request id. Query strings, headers and bodies are never logged, so titles, search terms, location names, notes, emails, passwords and tokens never reach the logs.
 - Public IDs are strings named `id`, not MongoDB `_id`; never return `__v` or internal model fields.
@@ -524,7 +524,7 @@ Memberships are never part of a group DTO; a group's books are read through its 
 | `GET`    | `/api/v1/{kind}/:id/books`                   | Query: `page`, `limit`                                 | `200` `{ "data": BookDto[], "meta": { "pagination" } }`                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND`                                                                  |
 | `GET`    | `/api/v1/books/:bookId/organization`         | —                                                      | `200` `{ "data": BookOrganizationDto }`                                               | `400 VALIDATION_ERROR`, `401`, `404 NOT_FOUND` "Book not found"                                                 |
 
-`{kind}` is `categories` (route parameter `categoryId`) or `collections` (`collectionId`). Responses under `/api/v1/categories`, `/api/v1/collections`, `/api/v1/wishlist` and `/api/v1/loans` send `Cache-Control: no-store`, like the other private paths; the organization endpoint inherits the `/api/v1/books` rule.
+`{kind}` is `categories` (route parameter `categoryId`) or `collections` (`collectionId`). Responses under `/api/v1/categories`, `/api/v1/collections`, `/api/v1/wishlist`, `/api/v1/loans` and `/api/v1/dashboard` send `Cache-Control: no-store`, like the other private paths; the organization endpoint inherits the `/api/v1/books` rule.
 
 - **Presets** are a fixed, read-only suggestion list in a deterministic order: `Fiction`, `Nonfiction`, `Biography`, `History`, `Philosophy`, `Psychology`, `Science`, `Technology`, `Religion`, `Personal Development`. They are never stored and never depend on the account: registering creates no categories, listing creates none, and a reader who created or deleted `Philosophy` still sees it suggested. A reader materializes a category only with `POST /categories`, with any name, preset or not.
 - **Fields (strict; `ownerId`, `normalizedName`, `bookIds`, `deletedAt`, `id` and any other field are rejected as `Unknown field`):** `name` is trimmed with inner whitespace collapsed, 1–100 characters, and cannot be `null`; `description` is trimmed, 1–500 characters, and on PATCH `null` clears it. Blank strings are rejected.
@@ -671,6 +671,100 @@ interface CopyLoanOverviewDto {
 | `asOf`          | existing calendar date; **only** with `status=overdue` (otherwise `400` naming `asOf`); defaults to the current **UTC** calendar day        |
 
 A loan due on the reference day is not yet overdue; a loan without a due date or already returned is never overdue. Totals reflect the filter before paging; an empty result is `data: []` with `totalPages: 0`. Request logs hold only method, path (with ids), status and request id; borrower details, dates, notes and query strings are never logged, and validation errors never echo submitted text.
+
+### Dashboard
+
+Read-only, **always derived** insights for the reader's Home screen. Nothing is stored: there is no dashboard collection, no counter on books, copies or users, and no activity log; every number is computed from the reader's own records on each request, following each module's visibility rules. Every endpoint requires a bearer access token. DTOs: `src/modules/dashboard/dashboard.dto.ts`. Bruno: `bruno/Dashboard/`.
+
+| Method | Path                                   | Query                                       | Success                                  | Errors                        |
+| ------ | -------------------------------------- | ------------------------------------------- | ---------------------------------------- | ----------------------------- |
+| `GET`  | `/api/v1/dashboard/summary`            | optional `asOf` (`YYYY-MM-DD`)              | `200` `{ "data": DashboardSummaryDto }`  | `400 VALIDATION_ERROR`, `401` |
+| `GET`  | `/api/v1/dashboard/reading-statistics` | none (every parameter is rejected)          | `200` `{ "data": ReadingStatisticsDto }` | `400 VALIDATION_ERROR`, `401` |
+| `GET`  | `/api/v1/dashboard/recent-activity`    | optional `limit` (integer 1–20, default 10) | `200` `{ "data": ActivityDto[] }`        | `400 VALIDATION_ERROR`, `401` |
+
+Responses under `/api/v1/dashboard` send `Cache-Control: no-store`. Each parameter may appear at most once; unknown parameters are rejected as `Unknown field`.
+
+```ts
+interface DashboardSummaryDto {
+  asOf: string; // the overdue reference day used: the given asOf, or the current UTC calendar day
+  catalogue: {
+    totalBooks: number; // visible books (never copies or wishes)
+    physicalBooks: number; // visible books with format "physical"
+    ebooks: number; // visible books with format "ebook"
+    physicalCopies: number; // non-deleted copies whose book is also visible
+  };
+  reading: {
+    unreadBooks: number; // visible books whose current status is unread
+    currentlyReadingBooks: number; // ... reading
+    completedBooks: number; // ... completed (a book being reread is "reading", not here)
+    booksEverCompleted: number; // visible books with at least one completed session
+    totalSessions: number; // sessions of visible books
+    completedSessions: number; // completed sessions of visible books, rereads included
+    rereadSessions: number; // per visible book, sessions after its first
+  };
+  notes: { notes: number; highlights: number }; // non-deleted, of visible books
+  wishlist: { wanted: number; acquired: number }; // non-deleted wishes
+  lending: {
+    activeLoans: number; // all active loans, even if their copy or book was deleted
+    overdueLoans: number; // active loans with dueOn before asOf
+    returnedLoans: number; // all returned loans, even if their copy or book was deleted
+  };
+}
+
+interface ReadingStatisticsCountsDto {
+  books: {
+    total: number;
+    unread: number;
+    reading: number;
+    completed: number;
+    everCompleted: number;
+  };
+  sessions: { total: number; inProgress: number; completed: number; rereads: number };
+}
+
+interface ReadingStatisticsDto {
+  overall: ReadingStatisticsCountsDto;
+  byFormat: { physical: ReadingStatisticsCountsDto; ebook: ReadingStatisticsCountsDto };
+}
+
+type ActivityType =
+  | 'book_added'
+  | 'reading_session_recorded'
+  | 'note_added'
+  | 'highlight_added'
+  | 'wishlist_item_added'
+  | 'loan_recorded';
+
+interface ActivityDto {
+  type: ActivityType;
+  resourceId: string; // id of the created record
+  bookId: string | null; // null for wishes; a loan's recorded book, which may no longer be visible
+  occurredAt: string; // the record's createdAt, ISO 8601 UTC
+}
+```
+
+**Reading status** is exactly the per-book [reading overview](#reading-sessions) rule: a book with an in-progress session is `reading` (even if it was completed before, i.e. a reread); otherwise `completed` if it has any completed session; otherwise `unread`, including books with no sessions. Books are partitioned into these three buckets, so `totalBooks = unreadBooks + currentlyReadingBooks + completedBooks`. `booksEverCompleted` / `everCompleted` counts **books** with any completed session, so a book being reread counts both as `reading` and as ever completed. `completedSessions` counts **sessions**, so every completed reread counts. `rereadSessions` / `rereads` counts every session of a book after its first, whatever its status or dates; no reading order is inferred from the optional `startedOn` and `completedOn`. Reading statistics use the book's **current** format; `overall` equals the sum of `physical` and `ebook` for every field. The summary's reading counters are the same calculation as `reading-statistics.overall`.
+
+**Invariants** of every summary: `totalBooks = physicalBooks + ebooks = unreadBooks + currentlyReadingBooks + completedBooks`; `completedBooks ≤ booksEverCompleted ≤ totalBooks`; `completedSessions ≤ totalSessions`; `rereadSessions ≤ totalSessions`; `overdueLoans ≤ activeLoans`. All counts are non-negative integers; an empty account returns zeros everywhere.
+
+**Visibility** follows each module: books, copies, reading sessions and notes of **deleted books** are not counted (their records stay stored); deleted copies, notes and wishes are not counted; an acquired wish stays `acquired` even after its linked book is deleted; **loans are counted whether or not their copy or book still exists**, as in [Loans](#loans). Another reader's records are never counted, even if a record wrongly references this reader's book.
+
+**`asOf`** is only the reference day for `overdueLoans` (an active loan is overdue when `dueOn` is strictly before `asOf`; a loan due on `asOf` is not). It must be an existing calendar day; when omitted, the current **UTC** calendar day is used, as in `GET /loans?status=overdue`. The effective day is returned as `asOf`.
+
+**Recent activity** lists the newest **recorded resources**, not an audit log: each item is a record that exists now, dated by its own `createdAt`.
+
+| `type`                     | Source record                                          | `bookId`                     |
+| -------------------------- | ------------------------------------------------------ | ---------------------------- |
+| `book_added`               | a visible book                                         | the book                     |
+| `reading_session_recorded` | a reading session of a visible book                    | its book                     |
+| `note_added`               | a non-deleted note (`kind: "note"`) of a visible book  | its book                     |
+| `highlight_added`          | a non-deleted highlight of a visible book              | its book                     |
+| `wishlist_item_added`      | a non-deleted wish, acquired or not                    | `null`                       |
+| `loan_recorded`            | any loan of the reader, even of a deleted copy or book | the loan's recorded `bookId` |
+
+There are **no** events for edits, deletions, returns, completions, acquisitions or group changes, because the records keep no reliable timestamp for them; `reading_session_recorded` means the session was recorded, not that reading started or finished then. Items are ordered by `occurredAt` descending, then `resourceId` descending, then `type` ascending; at most `limit` items are returned, with no paging. Only ids, types and timestamps are returned, never titles, note text, borrower details or wish text. Clients should tolerate a `bookId` that no longer resolves (a loan of a deleted book).
+
+**Consistency:** each counter comes from its own query, so while the reader is writing concurrently two counters may reflect slightly different moments. Each counter is exact for its own query; the book catalogue and reading buckets come from one list of books, so their partition always adds up. There are no cross-collection transactions.
 
 ### Responses on any path
 

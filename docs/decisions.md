@@ -359,6 +359,38 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
   deleted may reference a now-hidden copy; it stays visible and returnable in the global list.
   Standalone MongoDB has no transactions, and the global visibility makes the window harmless
   (tested).
+- **Loan histories are not reconciled with each other.** Correcting the dates of a returned loan
+  after the copy was lent again can make the two loans' date ranges overlap; the API validates each
+  loan's own chronology only. Revisit if the product needs strict per-copy interval history.
 - **No due-date index yet.** Overdue queries read the owner's active loans through
   `owner_returned_recent` and filter on `dueOn`; add a targeted index only when measurements
   justify it.
+
+## Dashboard decisions
+
+- **Always derived, never stored.** The dashboard computes every number from the owners' records
+  on each request. No counters on books, copies or users, no persisted reading status or
+  availability, no dashboard collection, no activity log, no timers. At personal-library scale
+  this is fast enough and cannot drift.
+- **Each module keeps its own visibility rules.** Counts exclude records of deleted books, as the
+  owning endpoints do, except loans, which stay counted (and listed in activity) after their copy
+  or book is deleted, matching the lending decisions. An acquired wish stays acquired after its
+  book is deleted. A wish is never a book, a copy is never a book, and a completed session is not
+  a completed book.
+- **One reading rule.** Status precedence (in progress, then completed, then unread) lives in
+  `readingStatusOf` and is shared by the per-book overview and the dashboard. `everCompleted`
+  counts books with any completed session, separately from the current-status partition, so a
+  reread in progress counts as both reading and ever completed.
+- **Only facts the data records.** Session `createdAt` is when the reader recorded the session,
+  not when they read; `completedOn` is optional; loan dates can be backdated and returns have no
+  event timestamp. So there are no streaks, durations, per-month completion charts or
+  `book_completed`/`loan_returned` events. Recent activity lists recently **created** resources by
+  their `createdAt` only.
+- **IDs only in activity.** Activity items carry ids, types and timestamps, never titles, note
+  text, borrower details or wish text; clients fetch details they are allowed to see.
+- **Overdue uses the UTC calendar day by default**, the same rule as `GET /loans`, and the
+  effective `asOf` is returned so clients can see which day was used.
+- **No cross-collection snapshot.** Counters come from independent queries, so concurrent writes
+  can make two counters reflect slightly different moments. Standalone MongoDB has no transactions,
+  and for a personal dashboard this bounded skew is acceptable; the catalogue and reading partition
+  come from one book list and always add up.
