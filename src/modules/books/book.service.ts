@@ -1,7 +1,8 @@
-import mongoose, { type PipelineStage } from 'mongoose';
+import mongoose, { type PipelineStage, type Types } from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
 import { AppError } from '../../shared/errors.js';
 import { toPublicBook, type BookDto, type DuplicateSuggestionDto } from './book.dto.js';
+import { pageOf, visibleMembersInOrder } from './book.membership.js';
 import { BookModel } from './book.model.js';
 import { toTextSearchWords } from '../../shared/text.js';
 import { normalizeIsbnForMatching, normalizeTitleForMatching } from './book.normalization.js';
@@ -12,6 +13,11 @@ import type {
   DuplicateCheckQuery,
   NewBook,
 } from './book.schema.js';
+
+export interface PageQuery {
+  page: number;
+  limit: number;
+}
 
 const MAX_DUPLICATE_SUGGESTIONS = 10;
 
@@ -131,6 +137,28 @@ export function keepDocumentsOfActiveBooks(ownerId: string, bookIdField: string)
     { $match: { [activeBook]: { $ne: [] } } },
     { $project: { [activeBook]: 0 } },
   ];
+}
+
+/**
+ * One page of the owner's active books among `memberIds`, in the order of `memberIds`. Hidden
+ * members are dropped before counting, so `total` and the pages reflect only visible books. All
+ * member books of one group are loaded at once; fine for personal libraries (hundreds of books),
+ * revisit with a membership collection if groups grow by orders of magnitude.
+ */
+export async function listActiveBooksInMembershipOrder(
+  ownerId: string,
+  memberIds: readonly Types.ObjectId[],
+  { page, limit }: PageQuery,
+): Promise<BookPage> {
+  const memberBooks = await BookModel.find({
+    ...activeBooksOwnedBy(ownerId),
+    _id: { $in: memberIds },
+  }).lean();
+  const visibleMembers = visibleMembersInOrder(memberIds, memberBooks);
+  return {
+    books: pageOf(visibleMembers, page, limit).map(toPublicBook),
+    pagination: toPaginationMeta(page, limit, visibleMembers.length),
+  };
 }
 
 function toBookUpdate(changes: BookChanges) {
