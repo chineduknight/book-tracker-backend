@@ -1,0 +1,28 @@
+meta {
+  name: Add export note
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/books/{{exportBookId}}/notes
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+body:json {
+  {
+    "kind": "note",
+    "content": "Use ``` fences\n# not a heading"
+  }
+}
+
+tests {
+  test("adds a note whose content contains a code fence", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

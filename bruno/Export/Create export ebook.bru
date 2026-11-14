@@ -1,0 +1,32 @@
+meta {
+  name: Create export ebook
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+body:json {
+  {
+    "title": "=SUM(1,2)",
+    "format": "ebook"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("exportEbookId", res.getBody().data.id);
+}
+
+tests {
+  test("creates an ebook whose title looks like a formula", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

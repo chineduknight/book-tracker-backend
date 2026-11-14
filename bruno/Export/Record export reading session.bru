@@ -1,0 +1,28 @@
+meta {
+  name: Record export reading session
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/books/{{exportBookId}}/reading-sessions
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+body:json {
+  {
+    "status": "completed",
+    "completedOn": "2026-01-02"
+  }
+}
+
+tests {
+  test("records a completed read", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

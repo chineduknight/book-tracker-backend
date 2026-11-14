@@ -1,0 +1,43 @@
+meta {
+  name: Notes Markdown
+  type: http
+  seq: 18
+}
+
+get {
+  url: {{baseUrl}}/export/notes.md
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{exportAccessToken}}
+}
+
+tests {
+  test("is a private book-tracker-notes download", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getHeader("content-type")).to.equal("text/markdown; charset=utf-8");
+    expect(res.getHeader("content-disposition")).to.match(
+      /^attachment; filename="book-tracker-notes-\d{4}-\d{2}-\d{2}\.\w+"$/,
+    );
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+
+  test("puts the note in a fence longer than its backticks", function () {
+    const markdown = res.getBody();
+    expect(markdown).to.contain("- Entries: 1");
+    expect(markdown).to.contain("## 1. Note");
+    expect(markdown).to.contain("````text\nUse ``` fences\n# not a heading\n````");
+    expect(markdown).to.contain("- Book: Meditations\\, \\\"Book 1\\\"");
+  });
+}
+
+docs {
+  # GET /api/v1/export/notes.md
+
+  Every note and highlight (deleted ones included and marked), oldest first, with its metadata.
+  Content and commentary sit in fenced blocks longer than any backtick run they contain, and
+  metadata text is backslash-escaped, so user text can never become headings, links or HTML. Book
+  titles come only from the reader's own books.
+}
