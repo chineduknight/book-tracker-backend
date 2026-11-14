@@ -93,6 +93,15 @@ export async function listCopiesOfBook(
   };
 }
 
+/** Book id of a visible copy of the owner, for modules that attach records to copies. */
+export async function requireVisibleCopyBookIdOwnedByUser(
+  ownerId: string,
+  copyId: string,
+): Promise<string> {
+  const copy = await findVisibleCopy(ownerId, copyId);
+  return copy.bookId.toHexString();
+}
+
 export async function findCopyOwnedByUser(
   ownerId: string,
   copyId: string,
