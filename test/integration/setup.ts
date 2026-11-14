@@ -3,6 +3,8 @@ import { afterAll, beforeAll, beforeEach } from 'vitest';
 import { RefreshTokenModel } from '../../src/modules/auth/refresh-token.model.js';
 import { SessionModel } from '../../src/modules/auth/session.model.js';
 import { BookModel } from '../../src/modules/books/book.model.js';
+import { CategoryModel } from '../../src/modules/categories/category.model.js';
+import { BookCollectionModel } from '../../src/modules/collections/collection.model.js';
 import { PhysicalCopyModel } from '../../src/modules/copies/copy.model.js';
 import { LocationModel } from '../../src/modules/locations/location.model.js';
 import { NoteModel } from '../../src/modules/notes/note.model.js';
@@ -32,6 +34,8 @@ async function deleteAuthData(): Promise<void> {
     PhysicalCopyModel.deleteMany({}),
     ReadingSessionModel.deleteMany({}),
     NoteModel.deleteMany({}),
+    CategoryModel.deleteMany({}),
+    BookCollectionModel.deleteMany({}),
   ]);
 }
 
@@ -49,6 +53,8 @@ beforeAll(async () => {
     PhysicalCopyModel.syncIndexes(),
     ReadingSessionModel.syncIndexes(),
     NoteModel.syncIndexes(),
+    CategoryModel.syncIndexes(),
+    BookCollectionModel.syncIndexes(),
   ]);
 });
 
