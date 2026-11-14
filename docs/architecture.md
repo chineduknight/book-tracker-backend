@@ -251,6 +251,31 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
   wishes need a small in-memory sort because the wishlist indexes put `status` before `createdAt`,
   which is acceptable at personal-library scale.
 
+## Export
+
+- `modules/export` serves `/export/archive`, `/export/books.csv`, `/export/reading-sessions.csv`,
+  `/export/loans.csv` and `/export/notes.md`. It has **no model and makes no writes**. It never
+  imports another module's model; it composes one archive read per owning module:
+  `streamBooksForArchive`, `streamLocationsForArchive`, `streamCopiesForArchive`,
+  `streamReadingSessionsForArchive`, `streamNotesForArchive`, `streamCategoriesForArchive`,
+  `streamCollectionsForArchive`, `streamWishlistItemsForArchive`, `streamLoansForArchive`, plus
+  `streamBookTitlesForArchive` (for Markdown labels) and the users service's `findUserById`.
+- Each archive read is an async generator over a Mongoose cursor on `{ ownerId }`, sorted by the
+  shared `ARCHIVE_ORDER` (`createdAt`, `_id` ascending). Unlike the normal lists it deliberately
+  applies **no** `deletedAt: null` filter and **no** active-parent join, so soft-deleted records
+  and records of deleted parents are archived. Each module maps rows with its own `toPublic*`
+  serializer and adds only `deletedAt` (and `bookIds` for groups) through `toArchived*`.
+- `BoundedExportWriter` assembles each download in memory, counting records and UTF-8 bytes on
+  every write and throwing `413 EXPORT_TOO_LARGE` the moment a limit is crossed. Records arrive
+  from the cursors in batches, so memory stays bounded by the limits; the response is sent only
+  after the whole download is built. The archive is written section by section in `ArchiveDto`
+  key order, producing exactly what `JSON.stringify` of the whole object would.
+- Each download reads only what it shows: books CSV reads books, loans CSV reads loans, sessions
+  CSV reads sessions, notes Markdown reads notes and the reader's book titles, the archive reads
+  the profile and all nine sections. The number of queries per download is constant.
+- The limits are injected through `createApp({ exportLimits })` so tests exercise them with small
+  values; production uses `EXPORT_LIMITS`.
+
 ## Runtime lifecycle
 
 - `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.

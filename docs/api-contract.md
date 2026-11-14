@@ -7,8 +7,8 @@ This document defines shared HTTP behavior. Every implemented endpoint must addi
 - Base path: `/api/v1`.
 - JSON responses use `Content-Type: application/json`; `204 No Content` has no body.
 - All responses include an `X-Request-Id` header. Error responses also include `requestId` in the body if one was assigned.
-- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories`, `/api/v1/collections`, `/api/v1/wishlist`, `/api/v1/loans` and `/api/v1/dashboard` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
-- CORS exposes `X-Request-Id` and `Location` to allowed browser origins.
+- Responses under `/api/v1/auth`, `/api/v1/books`, `/api/v1/copies`, `/api/v1/locations`, `/api/v1/reading-sessions`, `/api/v1/notes`, `/api/v1/categories`, `/api/v1/collections`, `/api/v1/wishlist`, `/api/v1/loans`, `/api/v1/dashboard` and `/api/v1/export` send `Cache-Control: no-store`, including errors raised before routing and CORS preflight, so private data is never kept in browser or shared caches.
+- CORS exposes `X-Request-Id`, `Location` and `Content-Disposition` to allowed browser origins.
 - **Logging:** request logs contain the method, the URL path (which includes resource ids such as `/api/v1/books/{id}`), the status and the request id. Query strings, headers and bodies are never logged, so titles, search terms, location names, notes, emails, passwords and tokens never reach the logs.
 - Public IDs are strings named `id`, not MongoDB `_id`; never return `__v` or internal model fields.
 - Timestamps use ISO 8601 UTC strings, e.g. `2026-11-13T10:30:00.000Z`. Calendar-only dates such as a loan due date use `YYYY-MM-DD` with an explicit business timezone policy; do not shift a date-only value by implicit UTC conversion.
@@ -86,7 +86,7 @@ Every error uses the established envelope:
 | `403 Forbidden`              | Authenticated user lacking permission for an action not concealed by ownership  | `FORBIDDEN`                                                                                                                                                                                                                                                                                        |
 | `404 Not Found`              | Missing route, missing resource, or resource owned by someone else              | `NOT_FOUND`                                                                                                                                                                                                                                                                                        |
 | `409 Conflict`               | Duplicate resource, a state that forbids the change, or an active-loan conflict | `CONFLICT`, `BOOK_NOT_PHYSICAL`, `BOOK_HAS_PHYSICAL_COPIES`, `READING_SESSION_IN_PROGRESS`, `INVALID_READING_TRANSITION`, `READING_SESSION_UPDATE_CONFLICT`, `READING_SESSION_BOOK_MISMATCH`, `WISHLIST_ALREADY_ACQUIRED`, `COPY_ALREADY_ON_LOAN`, `LOAN_ALREADY_RETURNED`, `LOAN_UPDATE_CONFLICT` |
-| `413 Payload Too Large`      | Body exceeds configured limit                                                   | `PAYLOAD_TOO_LARGE`                                                                                                                                                                                                                                                                                |
+| `413 Payload Too Large`      | Body exceeds configured limit, or an export exceeds its limits                  | `PAYLOAD_TOO_LARGE`, `EXPORT_TOO_LARGE`                                                                                                                                                                                                                                                            |
 | `415 Unsupported Media Type` | Unsupported request encoding                                                    | `UNSUPPORTED_MEDIA_TYPE`                                                                                                                                                                                                                                                                           |
 | `429 Too Many Requests`      | Rate limit exceeded (authentication endpoints)                                  | `RATE_LIMITED`                                                                                                                                                                                                                                                                                     |
 | `500 Internal Server Error`  | Unexpected server fault                                                         | `INTERNAL_ERROR`                                                                                                                                                                                                                                                                                   |
@@ -765,6 +765,74 @@ interface ActivityDto {
 There are **no** events for edits, deletions, returns, completions, acquisitions or group changes, because the records keep no reliable timestamp for them; `reading_session_recorded` means the session was recorded, not that reading started or finished then. Items are ordered by `occurredAt` descending, then `resourceId` descending, then `type` ascending; at most `limit` items are returned, with no paging. Only ids, types and timestamps are returned, never titles, note text, borrower details or wish text. Clients should tolerate a `bookId` that no longer resolves (a loan of a deleted book).
 
 **Consistency:** each counter comes from its own query, so while the reader is writing concurrently two counters may reflect slightly different moments. Each counter is exact for its own query; the book catalogue and reading buckets come from one list of books, so their partition always adds up. There are no cross-collection transactions.
+
+### Export
+
+User-initiated downloads of the signed-in reader's own data. The **JSON archive is the canonical, complete, portable record** of one reader's library: unlike the normal endpoints, it includes **soft-deleted records** and records of deleted books, with every historical reference. The CSV and Markdown files are friendlier views of parts of it, not replacements. Every endpoint requires a bearer access token and accepts **no query parameters** (any parameter, including a repeated one, is `400 VALIDATION_ERROR`); no request body is read. DTOs: `src/modules/export/export.dto.ts`. Bruno: `bruno/Export/`.
+
+| Method | Path                                  | `Content-Type`                    | `Content-Disposition` filename                 |
+| ------ | ------------------------------------- | --------------------------------- | ---------------------------------------------- |
+| `GET`  | `/api/v1/export/archive`              | `application/json; charset=utf-8` | `book-tracker-export-YYYY-MM-DD.json`          |
+| `GET`  | `/api/v1/export/books.csv`            | `text/csv; charset=utf-8`         | `book-tracker-books-YYYY-MM-DD.csv`            |
+| `GET`  | `/api/v1/export/reading-sessions.csv` | `text/csv; charset=utf-8`         | `book-tracker-reading-sessions-YYYY-MM-DD.csv` |
+| `GET`  | `/api/v1/export/loans.csv`            | `text/csv; charset=utf-8`         | `book-tracker-loans-YYYY-MM-DD.csv`            |
+| `GET`  | `/api/v1/export/notes.md`             | `text/markdown; charset=utf-8`    | `book-tracker-notes-YYYY-MM-DD.md`             |
+
+- **Success:** `200` with `Content-Disposition: attachment; filename="..."` (server-generated, ASCII; the date is the UTC day of `exportedAt`), `Content-Length`, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff` and `X-Request-Id`. CORS exposes `Content-Disposition` (with `X-Request-Id` and `Location`) to allowed origins, so a browser client can read the filename.
+- **Errors** use the normal JSON error envelope, never a file: `400 VALIDATION_ERROR` (query parameters), `401 UNAUTHENTICATED` (missing, invalid or revoked token, or the signed-in account no longer exists), `413 EXPORT_TOO_LARGE` (see limits), `500 INTERNAL_ERROR`. All send `no-store`, as do CORS preflight and body-parser errors.
+- **All or nothing:** a download is assembled completely and checked against the limits **before** any header or byte is sent, so a client never receives a partial or truncated file.
+
+#### Archive (`GET /api/v1/export/archive`)
+
+```ts
+interface ArchiveDto {
+  schemaVersion: 1;
+  exportedAt: string; // ISO 8601 UTC, set by the server
+  profile: UserDto; // { id, name, email, createdAt }; never credentials
+  books: BookExportDto[]; // BookDto & { deletedAt: string | null }
+  locations: StorageLocationDto[];
+  copies: PhysicalCopyExportDto[]; // PhysicalCopyDto & { deletedAt: string | null }
+  readingSessions: ReadingSessionDto[]; // all, including those of deleted books
+  notes: NoteExportDto[]; // NoteDto & { deletedAt: string | null }
+  categories: GroupExportDto[]; // CategoryDto & { bookIds: string[]; deletedAt: string | null }
+  collections: GroupExportDto[]; // BookCollectionDto & { bookIds: string[]; deletedAt: string | null }
+  wishlist: WishlistItemExportDto[]; // WishlistItemDto & { deletedAt: string | null }
+  loans: LoanDto[]; // all, including those of deleted copies and books
+}
+```
+
+The body is the standard success envelope `{ "data": ArchiveDto }`. Every section is always present (`[]` when empty) and contains **every stored record of the reader**, active and soft-deleted. Records use exactly the public DTOs of their own endpoints; soft-deletable ones add `deletedAt` (`null` unless deleted), and groups add `bookIds` in **membership order**, including ids of books deleted since. References are kept as stored (`bookId`, `copyId`, `locationId`, `readingSessionId`, `acquiredBookId`), even when they point to deleted records; nothing is resolved, repaired or invented, and no other reader's record is ever read. There is no per-record `ownerId`: `profile.id` is the owner of everything.
+
+- **Order:** each section is sorted by `createdAt` ascending, then `id` ascending; repeating the export of an unchanged library gives the same bytes apart from `exportedAt`. Keys appear in the order shown above.
+- **Values:** ids are lowercase hex; `createdAt`, `updatedAt`, `acquiredAt` and `deletedAt` are ISO 8601 UTC; calendar dates (`startedOn`, `completedOn`, `lentOn`, `dueOn`, `returnedOn`) are exactly as stored, with no time zone shift. Text, including Markdown source, accents and line breaks, is exactly as stored. Optional fields follow each DTO's omission rules.
+- **Never included:** passwords or their hashes, access or refresh tokens, sessions, refresh-token history, `_id`, `__v`, `ownerId`, `normalizedTitle`, `normalizedName`, `normalizedIsbn`, `chapterKey`, `priorityRank`, `revision`, `hasPhysicalCopyHistory`, derived values (reading status, availability, dashboard totals) or anything from other readers.
+
+#### CSV files
+
+Spreadsheet-friendly views with **active and soft-deleted** records, in the archive's order. UTF-8, RFC 4180 (fields with `"`, `,`, CR or LF are quoted and `"` is doubled), CRLF after every record, and a header line even when there are no records. Missing optional values are empty fields.
+
+| File                   | Columns, in order                                                                                                                |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `books.csv`            | `id,title,authors,format,isbn,edition,description,coverUrl,pageCount,chapterCount,publicationYear,createdAt,updatedAt,deletedAt` |
+| `reading-sessions.csv` | `id,bookId,status,progressUnit,progressValue,startedOn,completedOn,rating,summary,createdAt,updatedAt`                           |
+| `loans.csv`            | `id,copyId,bookId,borrowerName,borrowerContact,lentOn,dueOn,returnedOn,note,createdAt,updatedAt`                                 |
+
+- `authors` is a JSON array in one field (for example `["A","B"]`). `progressUnit` and `progressValue` are both empty when there is no progress; `returnedOn` is empty while a loan is active.
+- **Formula protection:** a cell whose first character, ignoring leading whitespace and control characters, is `=`, `+`, `-` or `@`, or that starts with a tab or carriage return, gets a leading `'` so spreadsheets show it as text. This is an irreversible presentation escape of the CSV only; stored data and the JSON archive keep the original text.
+- `loans.csv` contains borrower names and contacts: it is for the signed-in reader only.
+
+#### Notes Markdown (`GET /api/v1/export/notes.md`)
+
+A UTF-8 Markdown document: a title, `Exported at`, `Entries` (the number of notes and highlights), then one section per note or highlight, oldest first (`## 1. Note`, `## 2. Highlight`, …), including deleted ones and those of deleted books. Each section lists the note id, the book, the reading session (when linked), title, chapter and page (when set), creation and update times and whether it is deleted, followed by **Content** and, when set, **Commentary**. With no notes it is a short valid document saying so.
+
+- **Safe rendering:** content and commentary are in fenced code blocks (info string `text`) whose fence is longer than any run of backticks in the text, so nothing inside can end the block; they are shown verbatim, never as headings, links or HTML. Metadata text (book title, note title, chapter) has line breaks replaced by spaces and every ASCII punctuation character backslash-escaped. No links are generated and nothing is fetched. The JSON archive remains the unmodified source.
+- **Book labels:** the book title is taken only from the reader's own books, deleted ones included and marked `(deleted)`; a note whose book is not among them shows the book id.
+
+#### Limits
+
+Each download is limited to **20,000 records** and **32 MiB** of UTF-8 output (`EXPORT_LIMITS` in `src/modules/export/export.limits.ts`). Records are counted and bytes measured as the download is assembled, and it stops at the first record or byte over a limit with `413 { "error": { "code": "EXPORT_TOO_LARGE", "message": "This export is larger than a single download allows; please contact support", "requestId": "<id>" } }`; nothing of the file is sent. For the archive the record limit counts all sections together; for `notes.md` it also counts the books read for their titles. These are V1 operational guards, not a promise to export libraries of any size; a larger or streaming export can be added later, and nothing is ever silently left out.
+
+**Consistency:** sections are read one after another, not as one point-in-time snapshot, so changes made during a download may appear in some sections and not others. Exporting never writes, repairs or changes data. There is no import or restore yet.
 
 ### Responses on any path
 
