@@ -9,6 +9,7 @@ import type { PhysicalCopyDto } from '../../src/modules/copies/copy.dto.js';
 import type { StorageLocationDto } from '../../src/modules/locations/location.dto.js';
 import type { NoteDto } from '../../src/modules/notes/note.dto.js';
 import type { BookOrganizationDto } from '../../src/modules/organization/organization.dto.js';
+import type { WishlistItemDto } from '../../src/modules/wishlist/wishlist.dto.js';
 import type {
   BookReadingOverviewDto,
   ReadingSessionDto,
@@ -117,6 +118,21 @@ export function groupsApiFor(app: Express, accessToken: string, rootPath: string
 
 export type GroupsApi = ReturnType<typeof groupsApiFor>;
 
+export function wishlistApiFor(app: Express, accessToken: string) {
+  const authorized = authorizedWith(accessToken);
+  return {
+    create: (item: object) => authorized(request(app).post('/api/v1/wishlist')).send(item),
+    list: (query: Record<string, string> | string = {}) =>
+      authorized(request(app).get('/api/v1/wishlist')).query(query),
+    get: (itemId: string) => authorized(request(app).get(`/api/v1/wishlist/${itemId}`)),
+    update: (itemId: string, changes: object) =>
+      authorized(request(app).patch(`/api/v1/wishlist/${itemId}`)).send(changes),
+    acquire: (itemId: string, acquisition: object) =>
+      authorized(request(app).put(`/api/v1/wishlist/${itemId}/acquisition`)).send(acquisition),
+    remove: (itemId: string) => authorized(request(app).delete(`/api/v1/wishlist/${itemId}`)),
+  };
+}
+
 export async function signInLibraryReader(app: Express) {
   const { user, tokens } = await registerReader(app);
   return {
@@ -129,6 +145,7 @@ export async function signInLibraryReader(app: Express) {
     notes: notesApiFor(app, tokens.accessToken),
     categories: groupsApiFor(app, tokens.accessToken, 'categories'),
     collections: groupsApiFor(app, tokens.accessToken, 'collections'),
+    wishlist: wishlistApiFor(app, tokens.accessToken),
     presets: () =>
       authorizedWith(tokens.accessToken)(request(app).get('/api/v1/categories/presets')),
     organizationOf: (bookId: string) =>
@@ -159,6 +176,8 @@ export const groupFrom = (res: { body: unknown }) => dataFrom<GroupDto>(res);
 export const groupsFrom = (res: { body: unknown }) => dataFrom<GroupDto[]>(res);
 export const booksFrom = (res: { body: unknown }) => dataFrom<BookDto[]>(res);
 export const organizationFrom = (res: { body: unknown }) => dataFrom<BookOrganizationDto>(res);
+export const wishFrom = (res: { body: unknown }) => dataFrom<WishlistItemDto>(res);
+export const wishesFrom = (res: { body: unknown }) => dataFrom<WishlistItemDto[]>(res);
 
 export function paginationOf(res: { body: unknown }): PaginationMeta {
   return (res.body as { meta: { pagination: PaginationMeta } }).meta.pagination;
@@ -249,3 +268,7 @@ export const GROUP_KINDS = [
   ['collection', 'collections', 'Collection not found'],
 ] as const;
 export type GroupKind = (typeof GROUP_KINDS)[number][1];
+
+export function addWish(reader: LibraryReader, item: object = { title: 'Dune' }) {
+  return expectCreated<WishlistItemDto>(reader.wishlist.create(item));
+}

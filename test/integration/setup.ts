@@ -10,6 +10,7 @@ import { LocationModel } from '../../src/modules/locations/location.model.js';
 import { NoteModel } from '../../src/modules/notes/note.model.js';
 import { ReadingSessionModel } from '../../src/modules/reading/reading.model.js';
 import { UserModel } from '../../src/modules/users/user.model.js';
+import { WishlistItemModel } from '../../src/modules/wishlist/wishlist.model.js';
 
 const TEST_DATABASE_NAME = 'book-tracker-test';
 
@@ -36,6 +37,7 @@ async function deleteAuthData(): Promise<void> {
     NoteModel.deleteMany({}),
     CategoryModel.deleteMany({}),
     BookCollectionModel.deleteMany({}),
+    WishlistItemModel.deleteMany({}),
   ]);
 }
 
@@ -55,6 +57,7 @@ beforeAll(async () => {
     NoteModel.syncIndexes(),
     CategoryModel.syncIndexes(),
     BookCollectionModel.syncIndexes(),
+    WishlistItemModel.syncIndexes(),
   ]);
 });
 
