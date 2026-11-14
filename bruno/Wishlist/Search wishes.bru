@@ -1,0 +1,30 @@
+meta {
+  name: Search wishes
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/wishlist?q=darkness gift
+  body: none
+  auth: bearer
+}
+
+params:query {
+  q: darkness gift
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+tests {
+  test("finds words in the title and the note", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.map((item) => item.id)).to.eql([bru.getVar("wishlistItemId")]);
+  });
+}
+
+docs {
+  `q` matches whole words, ignoring case and diacritics; quotes and hyphens are plain text and results stay in creation order.
+}

@@ -1,0 +1,37 @@
+meta {
+  name: Register wishlist reader
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "name": "Bruno Wishlist Reader",
+    "email": "{{wishlistEmail}}",
+    "password": "{{wishlistPassword}}"
+  }
+}
+
+script:pre-request {
+  const runId = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  bru.setVar("wishlistEmail", `bruno-wishlist-${runId}@example.test`);
+  bru.setVar("wishlistPassword", `disposable-${runId}`);
+}
+
+script:post-response {
+  if (res.getStatus() === 201) {
+    bru.setVar("wishlistAccessToken", res.getBody().data.tokens.accessToken);
+  }
+}
+
+tests {
+  test("creates the disposable reader used by this folder", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

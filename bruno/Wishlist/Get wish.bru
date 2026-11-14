@@ -1,0 +1,22 @@
+meta {
+  name: Get wish
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/wishlist/{{wishlistItemId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+tests {
+  test("returns the item", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.id).to.equal(bru.getVar("wishlistItemId"));
+  });
+}

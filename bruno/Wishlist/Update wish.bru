@@ -1,0 +1,42 @@
+meta {
+  name: Update wish
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{baseUrl}}/wishlist/{{wishlistItemId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "priority": "medium",
+    "note": null,
+    "preferredFormat": "ebook"
+  }
+}
+
+tests {
+  test("changes the given fields and clears the note", function () {
+    expect(res.getStatus()).to.equal(200);
+    const item = res.getBody().data;
+    expect(item.priority).to.equal("medium");
+    expect(item.preferredFormat).to.equal("ebook");
+    expect(item).to.not.have.property("note");
+    expect(item.status).to.equal("wanted");
+  });
+}
+
+docs {
+  # PATCH /api/v1/wishlist/:wishlistItemId
+
+  Any nonempty subset of `title`, `authors`, `isbn`, `preferredFormat`, `coverUrl`, `sourceUrl`,
+  `priority`, `note`; `null` clears the optional ones. Works on wanted and acquired items alike;
+  `status` and the acquisition fields are rejected.
+}

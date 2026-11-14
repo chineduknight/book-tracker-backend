@@ -1,0 +1,17 @@
+meta {
+  name: Wishlist
+  seq: 11
+}
+
+docs {
+  # Wishlist
+
+  Books the reader hopes to obtain. A wishlist item is **not** a catalogue book: it never appears
+  in `GET /books`, has no copies, sessions, notes or groups, and duplicates are allowed. When the
+  reader gets the book, they add it to the catalogue with `POST /books` and then record the
+  acquisition, which links the wish to that owned book; nothing is created automatically.
+
+  Run the folder in order. **Register wishlist reader** creates its own disposable account and
+  the folder creates its own books, so it is independent of every other folder.
+  Contract: `docs/api-contract.md` ("Wishlist management").
+}

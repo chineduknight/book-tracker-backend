@@ -1,0 +1,36 @@
+meta {
+  name: Create minimal wish
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/wishlist
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Dune"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("wishlistSecondItemId", res.getBody().data.id);
+}
+
+tests {
+  test("defaults to medium priority, no authors and wanted status", function () {
+    expect(res.getStatus()).to.equal(201);
+    const item = res.getBody().data;
+    expect(item.authors).to.eql([]);
+    expect(item.priority).to.equal("medium");
+    expect(item.status).to.equal("wanted");
+    expect(item.acquiredBookId).to.equal(null);
+  });
+}

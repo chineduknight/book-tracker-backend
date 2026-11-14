@@ -1,0 +1,18 @@
+meta {
+  name: List wishes without token
+  type: http
+  seq: 25
+}
+
+get {
+  url: {{baseUrl}}/wishlist
+  body: none
+  auth: none
+}
+
+tests {
+  test("returns 401 UNAUTHENTICATED", function () {
+    expect(res.getStatus()).to.equal(401);
+    expect(res.getHeader("www-authenticate")).to.equal("Bearer");
+  });
+}

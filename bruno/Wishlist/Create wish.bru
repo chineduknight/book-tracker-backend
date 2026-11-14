@@ -1,0 +1,65 @@
+meta {
+  name: Create wish
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/wishlist
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "title": "  The Left Hand of   Darkness ",
+    "authors": ["Ursula K. Le Guin"],
+    "isbn": "978-0-441-47812-5",
+    "preferredFormat": "physical",
+    "priority": "high",
+    "sourceUrl": "https://shop.example.test/left-hand",
+    "note": "Gift idea"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("wishlistItemId", res.getBody().data.id);
+}
+
+tests {
+  test("returns 201 with exactly the public WishlistItemDto", function () {
+    expect(res.getStatus()).to.equal(201);
+    const item = res.getBody().data;
+    expect(item).to.eql({
+      id: item.id,
+      title: "The Left Hand of Darkness",
+      authors: ["Ursula K. Le Guin"],
+      isbn: "978-0-441-47812-5",
+      preferredFormat: "physical",
+      sourceUrl: "https://shop.example.test/left-hand",
+      priority: "high",
+      note: "Gift idea",
+      status: "wanted",
+      acquiredBookId: null,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+    });
+    expect(res.getHeader("location")).to.equal(`/api/v1/wishlist/${item.id}`);
+    expect(res.getHeader("cache-control")).to.equal("no-store");
+  });
+}
+
+docs {
+  # POST /api/v1/wishlist
+
+  Records a wanted book. Required: `title` (whitespace collapsed, 1–250). Optional: `authors`
+  (up to 20), `isbn`, `preferredFormat` (`physical` | `ebook`), `coverUrl`, `sourceUrl`
+  (http/https, never fetched), `priority` (`low` | `medium` default | `high`) and `note`
+  (1–2,000). `status`, `acquiredBookId` and `acquiredAt` are set only by the acquisition endpoint.
+
+  **201 Created**, `Location: /api/v1/wishlist/{id}`. **Errors**: `400 VALIDATION_ERROR`, `401`.
+}

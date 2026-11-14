@@ -1,0 +1,33 @@
+meta {
+  name: List wanted wishes
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/wishlist
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+tests {
+  test("lists wanted items newest first", function () {
+    expect(res.getStatus()).to.equal(200);
+    const ids = res.getBody().data.map((item) => item.id);
+    expect(ids).to.eql([bru.getVar("wishlistSecondItemId"), bru.getVar("wishlistItemId")]);
+    expect(res.getBody().meta.pagination).to.eql({ page: 1, limit: 20, total: 2, totalPages: 1 });
+  });
+}
+
+docs {
+  # GET /api/v1/wishlist
+
+  Query (each at most once): `page`, `limit` (1–100), `status` (`wanted` default | `acquired` |
+  `all`), `priority`, `q` (word search over title, authors and note) and `sort` (`recent`
+  default | `oldest` | `title_asc` | `title_desc` | `priority`, high first). Deleted items never
+  appear.
+}

@@ -1,0 +1,46 @@
+meta {
+  name: Acquire wish
+  type: http
+  seq: 13
+}
+
+put {
+  url: {{baseUrl}}/wishlist/{{wishlistItemId}}/acquisition
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "bookId": "{{wishlistBookId}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) bru.setVar("wishlistAcquiredAt", res.getBody().data.acquiredAt);
+}
+
+tests {
+  test("marks the wish acquired and links the owned book", function () {
+    expect(res.getStatus()).to.equal(200);
+    const item = res.getBody().data;
+    expect(item.status).to.equal("acquired");
+    expect(item.acquiredBookId).to.equal(bru.getVar("wishlistBookId"));
+    expect(item.acquiredAt).to.be.a("string");
+    expect(item.preferredFormat).to.equal("ebook");
+  });
+}
+
+docs {
+  # PUT /api/v1/wishlist/:wishlistItemId/acquisition
+
+  Body: exactly `{ "bookId" }`, one of the reader's active books. Moves the item from `wanted` to
+  `acquired` and records the book and time in one write. Repeating with the same book is
+  idempotent (same `acquiredAt`, nothing written); a different book returns
+  `409 WISHLIST_ALREADY_ACQUIRED`. The book is checked first (`404 "Book not found"`), then the
+  item (`404 "Wishlist item not found"`). No book or copy is created or changed.
+}

@@ -1,0 +1,35 @@
+meta {
+  name: Create wish with forbidden fields
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/wishlist
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Mine",
+    "status": "acquired",
+    "acquiredBookId": "64b7f0c2a1b2c3d4e5f60718",
+    "ownerId": "64b7f0c2a1b2c3d4e5f60718"
+  }
+}
+
+tests {
+  test("rejects status, acquisition and ownership fields as unknown", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([
+      { field: "status", message: "Unknown field" },
+      { field: "acquiredBookId", message: "Unknown field" },
+      { field: "ownerId", message: "Unknown field" },
+    ]);
+  });
+}

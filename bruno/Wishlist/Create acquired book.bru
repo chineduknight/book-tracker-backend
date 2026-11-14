@@ -1,0 +1,36 @@
+meta {
+  name: Create acquired book
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "title": "The Left Hand of Darkness",
+    "format": "ebook"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("wishlistBookId", res.getBody().data.id);
+}
+
+tests {
+  test("adds the obtained book to the catalogue first", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}
+
+docs {
+  Acquisition links an existing catalogue book; the client creates it with the normal books endpoint.
+}

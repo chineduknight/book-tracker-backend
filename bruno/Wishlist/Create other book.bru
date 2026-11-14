@@ -1,0 +1,32 @@
+meta {
+  name: Create other book
+  type: http
+  seq: 12
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+body:json {
+  {
+    "title": "Dune",
+    "format": "physical"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("wishlistOtherBookId", res.getBody().data.id);
+}
+
+tests {
+  test("adds a second owned book", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

@@ -1,0 +1,28 @@
+meta {
+  name: List all wishes
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/wishlist?status=all&sort=title_asc
+  body: none
+  auth: bearer
+}
+
+params:query {
+  status: all
+  sort: title_asc
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+tests {
+  test("lists wanted and acquired items by title", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.map((item) => item.title)).to.eql(["Dune", "The Left Hand of Darkness"]);
+    expect(res.getBody().meta.pagination.total).to.equal(2);
+  });
+}

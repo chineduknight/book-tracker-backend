@@ -1,0 +1,24 @@
+meta {
+  name: Get wish with malformed id
+  type: http
+  seq: 24
+}
+
+get {
+  url: {{baseUrl}}/wishlist/not-an-id
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{wishlistAccessToken}}
+}
+
+tests {
+  test("returns 400 naming wishlistItemId", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.details).to.eql([
+      { field: "wishlistItemId", message: "must be a 24-character hexadecimal id" },
+    ]);
+  });
+}
