@@ -367,3 +367,15 @@ deleted-user challenge assertion and the console assertion.
 | Browser refresh-token storage (HttpOnly cookie, CSRF, CORS change)                              | Before the frontend auth PR |
 | O(page) global notes and reading lists if libraries grow far beyond personal scale (§8)         | Later, on measurement       |
 | Historical loan intervals are not reconciled across loans of one copy (PR #10)                  | Needs a product policy      |
+
+### Status of the PR #14 follow-ups (recorded in PR #14)
+
+| Follow-up                              | State after PR #14                                                                                                                                                    |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `trust proxy` for the real proxy hops  | `TRUST_PROXY_HOPS` (default 0) implemented and tested through a local appending proxy; **the real host's hop count is pending the first approved staging deployment** |
+| Shared rate-limit store                | Not added: exactly one instance is a documented deployment constraint, logged at start; a shared store is a future, approved decision                                 |
+| Authenticated throttling / HA-05 quota | Per-reader limit implemented, **off by default** pending the owner's value; no stored-record quota                                                                    |
+| Indexes before traffic                 | Production never builds indexes on connect; `/ready` requires them; `npm run db:indexes` (read-only, additive `--apply`); tested on disposable databases              |
+| Timeouts, probes, supervision          | HTTP timeout policy, draining shutdown and subprocess lifecycle tests; host grace periods documented, **host behaviour pending staging**                              |
+| Backups and restore drills             | `npm run db:backup` and `npm run db:restore-rehearsal` with CI drill on MongoDB 8.0; **no backup of a shared database exists yet**                                    |
+| Pin GitHub Actions to commit SHAs      | Not done; still optional                                                                                                                                              |

@@ -3,6 +3,11 @@
 Procedures for operators with direct database access. None of these are API features, and none
 should be automated as user-facing actions.
 
+Deployment, indexes, backups and incidents have their own runbooks:
+[deployment-runbook.md](deployment-runbook.md), [index-operations.md](index-operations.md),
+[backup-and-restore.md](backup-and-restore.md) and
+[monitoring-and-budget.md](monitoring-and-budget.md).
+
 ## Book stuck as physical after a failed copy insert
 
 **Background.** Adding a physical copy first marks the parent book with the internal field

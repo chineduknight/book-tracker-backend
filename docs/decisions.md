@@ -441,3 +441,52 @@ BOOK_HAS_PHYSICAL_COPIES`), even after its copies are deleted, because future lo
 - **Tie-break tests write through the driver.** Mongoose treats `createdAt` as immutable and
   silently drops it from model updates, so tests that force identical creation times update the
   raw collection (`Model.collection.updateMany`).
+
+## Deployment and operations decisions
+
+Recorded in PR #14. Provider, plan, region, budget and backup tier are **not** decided here; they
+await the owner ([deployment-decision.md](deployment-decision.md)).
+
+- **One API instance.** Rate limits are kept in the process's memory, which is correct only with
+  exactly one instance. The process logs this at start; scaling out first needs a shared limiter
+  store, a separately approved (and paid) decision. No autoscaling.
+- **Trust an exact proxy hop count, never `true`.** `TRUST_PROXY_HOPS` (default `0`, at most 3,
+  whole numbers only) sets Express `trust proxy` to a hop count. `0` is safe but puts every client
+  behind a proxy into one bucket; a count above the real number of appending proxies lets callers
+  pick their address. Tests drive a real appending proxy; the host's count is measured on staging
+  ([deployment-runbook.md](deployment-runbook.md#5-proxy-hop-count-check-staging)) before it is
+  set. `Forwarded` and `X-Real-IP` are never used.
+- **Per-reader throttling is available but off.** `READER_REQUESTS_PER_MINUTE` limits each signed-in
+  account across private routes (after authentication, so failed authentication, probes and
+  preflights are not counted). The value is an operational ceiling the owner chooses; leaving it
+  off keeps V1 behaviour. Permanent per-reader quotas on stored records are a separate product
+  decision and are not introduced.
+- **Production fails closed on configuration.** With `NODE_ENV=production`, `CORS_ORIGIN` must be
+  `https://` origins, and the destructive tooling variables (`MONGODB_TEST_URI`,
+  `MONGODB_SMOKE_URI`, `RESTORE_REHEARSAL_URI`) must be absent. Errors still name only the variable.
+  `MONGODB_URI` validation is unchanged.
+- **Serving traffic never changes indexes; readiness requires them.** Production connects with
+  `autoIndex` and `autoCreate` off. After connecting, a read-only comparison of MongoDB's indexes
+  with the schemas must find nothing missing or conflicting before `/ready` turns 200, rechecking
+  every 30 s rather than blocking startup. Unique indexes decide races (active loans, in-progress
+  sessions, refresh tokens), so an instance without them must not receive traffic. Index builds
+  are a manual, additive operator step (`npm run db:indexes -- --apply`); `syncIndexes` is
+  test-only ([index-operations.md](index-operations.md)). Development keeps automatic additive
+  builds.
+- **HTTP timeouts are explicit.** Headers within 20 s and the whole request within 30 s (`408`);
+  idle keep-alive 65 s, longer than the documented 60 s proxy idle timeout so the proxy closes
+  idle connections first; a connection idle for 60 s while a response is pending is destroyed, so
+  a client that stops reading a 32 MiB export cannot hold its memory indefinitely. Request timeouts
+  do not limit response time, so a full export completes while the client reads.
+- **Shutdown drains, then stops.** On `SIGTERM`/`SIGINT`: stop accepting, close idle keep-alive
+  connections as soon as their requests finish, give in-flight requests 8 s, close the rest,
+  stop connection retries and the index check, disconnect, exit 0. A 10 s timer forces exit; a
+  second signal exits 1 immediately. Hosts must allow ≥ 15 s before `SIGKILL`.
+- **Backups are full database dumps, restored only into new databases.** The JSON export is not a
+  backup. `npm run db:backup` (mongodump) writes private, checksummed archives outside the
+  repository; `npm run db:restore-rehearsal` restores only into an empty local rehearsal database
+  and verifies it. There is no production restore command: real recovery restores into a new
+  database and repoints the API ([backup-and-restore.md](backup-and-restore.md)).
+- **No automatic deployment.** CI verifies only (`contents: read`, no deploy secrets); hosts run
+  with auto-deploy off; every deployment follows [release-checklist.md](release-checklist.md)
+  with the owner's approval.

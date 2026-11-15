@@ -11,7 +11,7 @@ get {
 }
 
 tests {
-  test("returns 200 when MongoDB is connected, otherwise 503", function () {
+  test("returns 200 when MongoDB is connected and its indexes are verified, otherwise 503", function () {
     expect([200, 503]).to.include(res.getStatus());
   });
 
@@ -21,13 +21,14 @@ tests {
       expect(body).to.eql({ data: { status: "ready", checks: { database: "connected" } } });
       return;
     }
-    expect(body).to.eql({
-      error: {
-        code: "SERVICE_UNAVAILABLE",
-        message: "Service is not ready: database is not connected",
-        requestId: res.getHeader("x-request-id"),
-      },
-    });
+    expect(body.error.code).to.equal("SERVICE_UNAVAILABLE");
+    expect(body.error.requestId).to.equal(res.getHeader("x-request-id"));
+    expect([
+      "Service is not ready: database is not connected",
+      "Service is not ready: required database indexes are not verified",
+    ]).to.include(body.error.message);
+    expect(Object.keys(body.error).sort()).to.eql(["code", "message", "requestId"]);
+    expect(Object.keys(body)).to.eql(["error"]);
   });
 
   test("is not cacheable and carries a request id", function () {
@@ -39,9 +40,11 @@ tests {
 docs {
   # GET /api/v1/ready
 
-  Readiness probe. Returns 200 only while MongoDB is fully connected; otherwise 503
-  (disconnected, connecting or disconnecting). No authentication. `HEAD` returns the same
-  status without a body. Both responses send `Cache-Control: no-store`.
+  Readiness probe and the host's health-check path. Returns 200 only while MongoDB is fully
+  connected **and** a read-only check has found every required index (unique, partial and TTL
+  indexes enforce invariants such as one active loan per copy); otherwise 503. No
+  authentication. `HEAD` returns the same status without a body. Both responses send
+  `Cache-Control: no-store`. Use this path, not `/health`, for host health checks.
 
   **200 OK**
 
@@ -60,6 +63,10 @@ docs {
     }
   }
   ```
+
+  While required indexes are missing or conflicting (production never builds them itself; see
+  `docs/index-operations.md`), the message is
+  `"Service is not ready: required database indexes are not verified"`.
 
   Stop MongoDB (or point `MONGODB_URI` at an unused port) to see the 503 response.
 
