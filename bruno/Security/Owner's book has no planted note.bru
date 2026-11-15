@@ -1,0 +1,22 @@
+meta {
+  name: Owner's book has no planted note
+  type: http
+  seq: 20
+}
+
+get {
+  url: {{baseUrl}}/books/{{securityBookId}}/notes
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityOwnerToken}}
+}
+
+tests {
+  test("has no note added by the intruder", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data).to.eql([]);
+  });
+}

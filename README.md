@@ -69,15 +69,15 @@ returns 503 until a connection is established (connection attempts are retried e
 Validated with Zod at startup. Invalid configuration aborts with a list of offending variable
 names; values are never printed.
 
-| Variable                  | Required          | Default                 | Notes                                                                                                 |
-| ------------------------- | ----------------- | ----------------------- | ----------------------------------------------------------------------------------------------------- |
-| `MONGODB_URI`             | yes               | —                       | `mongodb://` or `mongodb+srv://`. Keep credentials in `.env`                                          |
-| `NODE_ENV`                | no                | `development`           | `development` \| `test` \| `production`                                                               |
-| `PORT`                    | no                | `3000`                  | 1–65535                                                                                               |
-| `CORS_ORIGIN`             | no                | `http://localhost:5173` | Comma-separated exact origins. `*` is rejected                                                        |
-| `LOG_LEVEL`               | no                | `info`                  | `fatal` `error` `warn` `info` `debug` `trace` `silent`                                                |
-| `JWT_ACCESS_TOKEN_SECRET` | yes               | —                       | Signs access tokens. base64url, at least 32 random bytes; see Getting started                         |
-| `MONGODB_TEST_URI`        | integration tests | —                       | e.g. `mongodb://127.0.0.1:27017/book-tracker-test`; tests always use the `book-tracker-test` database |
+| Variable                  | Required          | Default                 | Notes                                                                                                  |
+| ------------------------- | ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ |
+| `MONGODB_URI`             | yes               | —                       | `mongodb://` or `mongodb+srv://`. Keep credentials in `.env`                                           |
+| `NODE_ENV`                | no                | `development`           | `development` \| `test` \| `production`                                                                |
+| `PORT`                    | no                | `3000`                  | 1–65535                                                                                                |
+| `CORS_ORIGIN`             | no                | `http://localhost:5173` | Comma-separated exact origins. `*` is rejected                                                         |
+| `LOG_LEVEL`               | no                | `info`                  | `fatal` `error` `warn` `info` `debug` `trace` `silent`                                                 |
+| `JWT_ACCESS_TOKEN_SECRET` | yes               | —                       | Signs access tokens. base64url, at least 32 random bytes; see Getting started                          |
+| `MONGODB_TEST_URI`        | integration tests | —                       | `mongodb://127.0.0.1:27017/book-tracker-test`: one local host, that database; anything else is refused |
 
 `.env` and other `.env.*` files are git-ignored; only `.env.example` (fake values) is committed.
 
@@ -220,13 +220,23 @@ See [docs/architecture.md](docs/architecture.md), [docs/decisions.md](docs/decis
 
 ## Running the integration tests
 
-The integration suite needs a MongoDB server. It connects to the `book-tracker-test` database
-whatever the URI names, and deletes users and sessions between tests, so never point it at data
-you want to keep.
+The integration suite needs a MongoDB server. It deletes every document of the
+`book-tracker-test` database before each test, so it refuses to connect, before opening any
+connection, unless `MONGODB_TEST_URI` is a plain `mongodb://` URI with exactly one local host
+(`127.0.0.1`, `localhost` or `[::1]`), names the `book-tracker-test` database and uses only the
+options `appName`, `authMechanism`, `authSource`, `connectTimeoutMS`, `directConnection` or
+`serverSelectionTimeoutMS`. `mongodb+srv://`, remote or multiple hosts, other database names,
+replica-set discovery, proxies and TLS are refused, and `directConnection=true` is enforced. The
+refusal names only the rule, never the URI. The same rules guard `npm run api:smoke` and its
+`book-tracker-smoke` database.
 
 ```bash
 MONGODB_TEST_URI=mongodb://127.0.0.1:27017/book-tracker-test npm run test:integration
 ```
+
+A local address does not prove the server is disposable: an SSH tunnel or port forward on
+`localhost` can reach a remote server, and no URI check can tell. Only run the suite against a
+MongoDB you know is a throwaway local instance.
 
 No local MongoDB? A throwaway container works:
 `docker run --rm -d -p 27017:27017 --name book-tracker-test-mongo mongo:8.0`.
@@ -255,5 +265,6 @@ reading-session deletion, UI, deployment.
 
 ## Upcoming PRs
 
-1. **Backend hardening** across modules (security, performance, robustness).
-2. **Deployment and operations.**
+1. **Deployment and operations** (hosting, MongoDB Atlas, index rollout, backups, reverse proxy,
+   probes, observability). The backend hardening audit and its follow-ups are in
+   [docs/hardening-audit.md](docs/hardening-audit.md).

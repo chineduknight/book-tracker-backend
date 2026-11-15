@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import { rateLimit, type Options } from 'express-rate-limit';
+import type { Logger } from '../../config/logger.js';
 import { rateLimitedError } from './auth.errors.js';
 import { normalizedEmailSchema } from './auth.schema.js';
 
@@ -25,11 +26,24 @@ export const DEFAULT_AUTH_RATE_LIMITS: AuthRateLimits = {
   failedLoginsPerAccount: { limit: 10, windowMs: FIFTEEN_MINUTES_MS },
 };
 
-const sharedOptions: Partial<Options> = {
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  handler: (_req, _res, next) => next(rateLimitedError()),
-};
+const LIMITER_PROBLEM = 'Rate limiter reported a problem';
+
+/*
+ * express-rate-limit reports misconfiguration (for example X-Forwarded-For without `trust proxy`)
+ * and store failures to the console with a stack by default; route them through the safe `err`
+ * serializer instead.
+ */
+function sharedOptionsFor(logger: Logger): Partial<Options> {
+  return {
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    handler: (_req, _res, next) => next(rateLimitedError()),
+    logger: {
+      error: (error) => logger.error({ err: error }, LIMITER_PROBLEM),
+      warn: (error) => logger.warn({ err: error }, LIMITER_PROBLEM),
+    },
+  };
+}
 
 function loginEmailOf(req: Request): string | undefined {
   const body: unknown = req.body;
@@ -38,7 +52,8 @@ function loginEmailOf(req: Request): string | undefined {
   return email.success ? email.data : undefined;
 }
 
-export function createAuthRateLimiters(limits: AuthRateLimits) {
+export function createAuthRateLimiters(limits: AuthRateLimits, logger: Logger) {
+  const sharedOptions = sharedOptionsFor(logger);
   return {
     limitAuthRequestsPerIp: rateLimit({ ...sharedOptions, ...limits.authRequestsPerIp }),
     limitRegistrationsPerIp: rateLimit({ ...sharedOptions, ...limits.registrationsPerIp }),

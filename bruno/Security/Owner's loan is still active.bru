@@ -1,0 +1,23 @@
+meta {
+  name: Owner's loan is still active
+  type: http
+  seq: 19
+}
+
+get {
+  url: {{baseUrl}}/loans/{{securityLoanId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityOwnerToken}}
+}
+
+tests {
+  test("was not returned by the intruder", function () {
+    expect(res.getStatus()).to.equal(200);
+    expect(res.getBody().data.returnedOn).to.equal(null);
+    expect(res.getBody().data.borrowerName).to.equal("Private Borrower");
+  });
+}

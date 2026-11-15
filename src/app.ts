@@ -85,7 +85,12 @@ export function createApp({
   api.use(healthRouter);
   api.use(
     AUTH_PATH,
-    createAuthRouter({ accessTokens, requireAuthenticatedUser, rateLimits: authRateLimits }),
+    createAuthRouter({
+      accessTokens,
+      requireAuthenticatedUser,
+      rateLimits: authRateLimits,
+      logger,
+    }),
   );
   api.use(createLoansRouter({ requireAuthenticatedUser }));
   api.use(createCopiesRouter({ requireAuthenticatedUser }));

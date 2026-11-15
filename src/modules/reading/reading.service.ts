@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { closingWhenDone } from '../../shared/archive-cursor.js';
 import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { invalidFieldsError } from '../../shared/request-validation.js';
@@ -369,7 +370,9 @@ export async function listRecentlyRecordedSessions(
 export async function* streamReadingSessionsForArchive(
   ownerId: string,
 ): AsyncGenerator<ReadingSessionDto> {
-  const sessions = ReadingSessionModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor();
+  const sessions = closingWhenDone(
+    ReadingSessionModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor(),
+  );
   for await (const session of sessions) {
     yield toPublicReadingSession(session);
   }

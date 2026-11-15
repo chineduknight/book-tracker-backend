@@ -1,5 +1,6 @@
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { closingWhenDone } from '../../shared/archive-cursor.js';
 import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { toCaseInsensitiveKey } from '../../shared/text.js';
@@ -186,7 +187,9 @@ export async function findCollectionsContainingBook(
 export async function* streamCollectionsForArchive(
   ownerId: string,
 ): AsyncGenerator<BookCollectionExportDto> {
-  const collections = BookCollectionModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor();
+  const collections = closingWhenDone(
+    BookCollectionModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor(),
+  );
   for await (const collection of collections) {
     yield toArchivedBookCollection(collection);
   }

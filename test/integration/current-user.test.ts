@@ -82,7 +82,7 @@ describe('GET /api/v1/auth/me', () => {
     ],
     ['the session no longer exists', () => SessionModel.deleteMany({})],
     ['the user no longer exists', () => UserModel.deleteMany({})],
-  ])('returns 401 UNAUTHENTICATED when %s', async (_label, invalidate) => {
+  ])('returns 401 UNAUTHENTICATED with a Bearer challenge when %s', async (_label, invalidate) => {
     const app = createAuthTestApp();
     const { tokens } = await registerReader(app);
     await invalidate();
@@ -92,6 +92,8 @@ describe('GET /api/v1/auth/me', () => {
       .set('Authorization', bearer(tokens.accessToken));
 
     expect(res.status).toBe(401);
+    expect(res.headers['www-authenticate']).toBe('Bearer');
+    expect(res.headers['cache-control']).toBe('no-store');
     expect(res.body).toEqual({
       error: {
         code: 'UNAUTHENTICATED',

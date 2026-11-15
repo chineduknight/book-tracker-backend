@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { closingWhenDone } from '../../shared/archive-cursor.js';
 import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import {
@@ -162,10 +163,9 @@ export async function countVisibleCopiesOwnedByUser(ownerId: string): Promise<nu
 export async function* streamCopiesForArchive(
   ownerId: string,
 ): AsyncGenerator<PhysicalCopyExportDto> {
-  for await (const copy of PhysicalCopyModel.find({ ownerId })
-    .sort(ARCHIVE_ORDER)
-    .lean()
-    .cursor()) {
+  for await (const copy of closingWhenDone(
+    PhysicalCopyModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor(),
+  )) {
     yield toArchivedPhysicalCopy(copy);
   }
 }

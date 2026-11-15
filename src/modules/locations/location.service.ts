@@ -1,5 +1,6 @@
 import { isDuplicateKeyError } from '../../db/mongo.js';
 import { toPaginationMeta, type PaginationMeta } from '../../shared/api-response.js';
+import { closingWhenDone } from '../../shared/archive-cursor.js';
 import { ARCHIVE_ORDER } from '../../shared/archive-order.js';
 import { AppError } from '../../shared/errors.js';
 import { toCaseInsensitiveKey } from '../../shared/text.js';
@@ -115,10 +116,9 @@ export async function requireLocationOwnedByUser(ownerId: string, locationId: st
 export async function* streamLocationsForArchive(
   ownerId: string,
 ): AsyncGenerator<StorageLocationDto> {
-  for await (const location of LocationModel.find({ ownerId })
-    .sort(ARCHIVE_ORDER)
-    .lean()
-    .cursor()) {
+  for await (const location of closingWhenDone(
+    LocationModel.find({ ownerId }).sort(ARCHIVE_ORDER).lean().cursor(),
+  )) {
     yield toPublicStorageLocation(location);
   }
 }

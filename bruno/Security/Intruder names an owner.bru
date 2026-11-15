@@ -1,0 +1,35 @@
+meta {
+  name: Intruder names an owner
+  type: http
+  seq: 15
+}
+
+post {
+  url: {{baseUrl}}/books
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityIntruderToken}}
+}
+
+body:json {
+  {
+    "title": "Planted book",
+    "format": "physical",
+    "ownerId": "{{securityOwnerId}}"
+  }
+}
+
+tests {
+  test("refuses an owner field instead of ignoring or honouring it", function () {
+    expect(res.getStatus()).to.equal(400);
+    expect(res.getBody().error.code).to.equal("VALIDATION_ERROR");
+    expect(res.getBody().error.details).to.eql([{ field: "ownerId", message: "Unknown field" }]);
+  });
+}
+
+docs {
+  The owner always comes from the access token; a request can never choose it.
+}

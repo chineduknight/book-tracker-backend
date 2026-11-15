@@ -1,0 +1,33 @@
+meta {
+  name: Lend owner's copy
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/copies/{{securityCopyId}}/loans
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityOwnerToken}}
+}
+
+body:json {
+  {
+    "borrowerName": "Private Borrower",
+    "borrowerContact": "private-borrower@example.test",
+    "lentOn": "2026-11-14"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 201) bru.setVar("securityLoanId", res.getBody().data.id);
+}
+
+tests {
+  test("lends the owner's copy", function () {
+    expect(res.getStatus()).to.equal(201);
+  });
+}

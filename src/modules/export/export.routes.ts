@@ -1,7 +1,6 @@
 import { Router, type Request, type RequestHandler, type Response } from 'express';
 import { parseRequestQuery } from '../../shared/request-validation.js';
-import { unauthenticatedError } from '../auth/auth.errors.js';
-import { authenticatedUserOf } from '../auth/auth.middleware.js';
+import { authenticatedUserOf, rejectAsUnauthenticated } from '../auth/auth.middleware.js';
 import type { UserDto } from '../users/user.dto.js';
 import { findUserById } from '../users/user.service.js';
 import type { Download } from './export.dto.js';
@@ -37,9 +36,8 @@ const DOWNLOADS: Record<string, DownloadBuilder> = {
  */
 async function exportingProfileOf(req: Request, res: Response): Promise<UserDto> {
   const profile = await findUserById(authenticatedUserOf(req).userId);
-  if (profile) return profile;
-  res.set('WWW-Authenticate', 'Bearer');
-  throw unauthenticatedError();
+  if (!profile) rejectAsUnauthenticated(res);
+  return profile;
 }
 
 function sendDownload(res: Response, { filename, contentType, body }: Download): void {

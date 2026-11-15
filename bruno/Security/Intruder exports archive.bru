@@ -1,0 +1,29 @@
+meta {
+  name: Intruder exports archive
+  type: http
+  seq: 14
+}
+
+get {
+  url: {{baseUrl}}/export/archive
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{securityIntruderToken}}
+}
+
+tests {
+  test("contains only the intruder's own, empty, library", function () {
+    expect(res.getStatus()).to.equal(200);
+    const archive = res.getBody().data;
+    for (const section of ["books", "copies", "loans", "notes"]) {
+      expect(archive[section]).to.eql([]);
+    }
+    const text = JSON.stringify(res.getBody());
+    for (const privateText of ["Security private book", "Only the owner", "Private Borrower", "private-borrower@"]) {
+      expect(text).to.not.include(privateText);
+    }
+  });
+}

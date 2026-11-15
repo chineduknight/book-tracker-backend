@@ -1,0 +1,20 @@
+meta {
+  name: Security
+  seq: 15
+}
+
+docs {
+  # Security
+
+  Cross-reader isolation, seen from outside. Two disposable readers are registered: an **owner**
+  with a private book, copy and active loan, and an **intruder**. Every attempt by the intruder to
+  read or change the owner's records by id answers exactly like a missing record (`404`, same body),
+  nothing of the owner's appears in the intruder's lists or export, the request cannot name an
+  owner, and the owner's records are unchanged afterwards. Forged tokens are refused with a Bearer
+  challenge.
+
+  Run the folder in order; it is independent of every other folder. The integration suite covers
+  every route this way (`test/integration/cross-owner-isolation.test.ts`); this folder keeps a
+  representative, runnable sample.
+  Contract: `docs/api-contract.md` ("General rules", "Authentication and session tokens").
+}
