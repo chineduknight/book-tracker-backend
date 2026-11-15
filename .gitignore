@@ -12,6 +12,11 @@ coverage/
 *.pem
 *.key
 
+# Database backups must never be committed (npm run db:backup also refuses the repository)
+*.archive.gz
+*.archive.gz.manifest.json
+*.archive.gz.age
+
 # Logs
 logs/
 *.log

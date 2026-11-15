@@ -175,10 +175,16 @@ describe.skipIf(!databaseToolsAvailable && !databaseToolsRequired)(
     });
 
     it('refuses to write a backup inside the repository', async () => {
-      const backup = await backUp(join(process.cwd(), 'backups'));
+      const insideRepository = join(process.cwd(), 'backups-refusal-check');
+      try {
+        const backup = await backUp(insideRepository);
 
-      expect(backup.exitCode).toBe(1);
-      expect(backup.output).toContain('refused: --out-dir must be outside the repository');
+        expect(backup.exitCode).toBe(1);
+        expect(backup.output).toContain('refused: --out-dir must be outside the repository');
+      } finally {
+        // If the guard ever regresses, never leave a dump in the working tree.
+        await rm(insideRepository, { recursive: true, force: true });
+      }
     });
 
     it('refuses an output directory other local users can read', async () => {
