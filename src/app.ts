@@ -7,7 +7,11 @@ import { preventResponseCaching } from './middleware/prevent-response-caching.js
 import { REQUEST_ID_HEADER, requestLogger } from './middleware/request-logger.js';
 import { createAccessTokenService } from './modules/auth/access-token.js';
 import { createAuthenticationMiddleware } from './modules/auth/auth.middleware.js';
-import { DEFAULT_AUTH_RATE_LIMITS, type AuthRateLimits } from './modules/auth/auth.rate-limits.js';
+import {
+  createReaderRateLimiter,
+  DEFAULT_AUTH_RATE_LIMITS,
+  type AuthRateLimits,
+} from './modules/auth/auth.rate-limits.js';
 import { createAuthRouter } from './modules/auth/auth.routes.js';
 import { createBooksRouter } from './modules/books/book.routes.js';
 import { createCategoriesRouter } from './modules/categories/category.routes.js';
@@ -22,7 +26,11 @@ import { createNotesRouter } from './modules/notes/note.routes.js';
 import { createOrganizationRouter } from './modules/organization/organization.routes.js';
 import { createReadingRouter } from './modules/reading/reading.routes.js';
 import { createWishlistRouter } from './modules/wishlist/wishlist.routes.js';
-import { healthRouter } from './modules/health/health.routes.js';
+import {
+  createHealthRouter,
+  requireDatabaseConnection,
+  type ReadinessCheck,
+} from './modules/health/health.routes.js';
 
 export const API_PREFIX = '/api/v1';
 const AUTH_PATH = '/auth';
@@ -49,6 +57,14 @@ export interface AppOptions {
   accessTokenSecret: Uint8Array;
   authRateLimits?: AuthRateLimits;
   exportLimits?: ExportLimits;
+  /**
+   * Number of reverse proxies in front of the API whose X-Forwarded-For entries are trusted.
+   * 0 (the default) trusts none: the client address is the TCP peer.
+   */
+  trustProxyHops?: number;
+  /** Per-reader request ceiling across private routes; omitted means no per-reader throttle. */
+  readerRequestsPerMinute?: number | undefined;
+  readiness?: ReadinessCheck;
 }
 
 /** Assembles the Express application. It does not listen or connect to MongoDB. */
@@ -58,9 +74,14 @@ export function createApp({
   accessTokenSecret,
   authRateLimits = DEFAULT_AUTH_RATE_LIMITS,
   exportLimits = EXPORT_LIMITS,
+  trustProxyHops = 0,
+  readerRequestsPerMinute,
+  readiness = requireDatabaseConnection,
 }: AppOptions): Express {
   const app = express();
   app.disable('x-powered-by');
+  // A hop count, never `true`: trusting every hop would let any caller choose its own address.
+  if (trustProxyHops > 0) app.set('trust proxy', trustProxyHops);
 
   app.use(requestLogger(logger));
   // Before CORS and the body parser, so preflight and body-parsing errors are covered too.
@@ -79,10 +100,14 @@ export function createApp({
   app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
   const accessTokens = createAccessTokenService(accessTokenSecret);
-  const requireAuthenticatedUser = createAuthenticationMiddleware(accessTokens);
+  const authenticate = createAuthenticationMiddleware(accessTokens);
+  const requireAuthenticatedUser =
+    readerRequestsPerMinute === undefined
+      ? authenticate
+      : Router().use(authenticate, createReaderRateLimiter(readerRequestsPerMinute, logger));
 
   const api = Router();
-  api.use(healthRouter);
+  api.use(createHealthRouter(readiness));
   api.use(
     AUTH_PATH,
     createAuthRouter({
