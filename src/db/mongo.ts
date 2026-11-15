@@ -27,7 +27,25 @@ export interface ConnectOptions {
   logger: Logger;
   /** Aborting stops further retries (used during shutdown). */
   signal: AbortSignal;
+  /**
+   * Whether Mongoose may create collections and missing indexes when it connects. Only for
+   * development and tests: production indexes are built by an operator before traffic (see
+   * docs/index-operations.md), so serving traffic never starts an index build.
+   */
+  buildIndexesOnConnect: boolean;
   retryDelayMs?: number;
+}
+
+export function connectionOptionsFor({
+  buildIndexesOnConnect,
+}: {
+  buildIndexesOnConnect: boolean;
+}) {
+  return {
+    serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS,
+    autoIndex: buildIndexesOnConnect,
+    autoCreate: buildIndexesOnConnect,
+  };
 }
 
 /**
@@ -39,12 +57,12 @@ export interface ConnectOptions {
  * Resolves `true` once connected, or `false` if aborted first.
  */
 export async function connectWithRetry(uri: string, options: ConnectOptions): Promise<boolean> {
-  const { logger, signal, retryDelayMs = 5_000 } = options;
+  const { logger, signal, buildIndexesOnConnect, retryDelayMs = 5_000 } = options;
   mongoose.set('strictQuery', true);
 
   for (let attempt = 1; !signal.aborted; attempt += 1) {
     try {
-      await mongoose.connect(uri, { serverSelectionTimeoutMS: SERVER_SELECTION_TIMEOUT_MS });
+      await mongoose.connect(uri, connectionOptionsFor({ buildIndexesOnConnect }));
       return true;
     } catch (error) {
       if (signal.aborted) break;
