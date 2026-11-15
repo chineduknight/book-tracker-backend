@@ -22,7 +22,9 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "api:test": "cd bruno && npx --yes @usebruno/cli@4.3.0 run --env local",
     "api:smoke": "npm run build && tsx scripts/api-smoke.ts",
-    "db:indexes": "tsx scripts/db-indexes.ts"
+    "db:indexes": "tsx scripts/db-indexes.ts",
+    "db:backup": "tsx scripts/db-backup.ts",
+    "db:restore-rehearsal": "tsx scripts/db-restore-rehearsal.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",

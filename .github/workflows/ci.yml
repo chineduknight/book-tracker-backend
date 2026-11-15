@@ -36,7 +36,8 @@ jobs:
 
   integration:
     name: MongoDB integration tests and Bruno smoke test
-    runs-on: ubuntu-latest
+    # Pinned to match the Database Tools package below.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     services:
       mongodb:
@@ -50,6 +51,10 @@ jobs:
           --health-retries 20
     env:
       MONGODB_TEST_URI: mongodb://127.0.0.1:27017/book-tracker-test
+      # The backup and restore drill must run here, not be skipped for missing tools.
+      REQUIRE_DATABASE_TOOLS: '1'
+      DATABASE_TOOLS_VERSION: 100.16.1
+      DATABASE_TOOLS_SHA256: e4f58be8674e01c372a15ff69a6da047f1c5a78ae5cbc62a32ed2ab78ace2410
     steps:
       - uses: actions/checkout@v7
 
@@ -57,6 +62,15 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+
+      - name: Install MongoDB Database Tools (mongodump, mongorestore)
+        run: |
+          package="mongodb-database-tools-ubuntu2404-x86_64-${DATABASE_TOOLS_VERSION}.deb"
+          curl --fail --silent --show-error --location --output "$RUNNER_TEMP/$package" \
+            "https://fastdl.mongodb.org/tools/db/$package"
+          echo "${DATABASE_TOOLS_SHA256}  $RUNNER_TEMP/$package" | sha256sum --check --strict
+          sudo apt-get install --yes --no-install-recommends "$RUNNER_TEMP/$package"
+          mongodump --version
 
       - run: npm ci
       - run: npm run test:integration
