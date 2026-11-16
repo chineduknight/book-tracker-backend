@@ -2,6 +2,7 @@ import type { Request } from 'express';
 import { rateLimit, type Options } from 'express-rate-limit';
 import type { Logger } from '../../config/logger.js';
 import { rateLimitedError } from './auth.errors.js';
+import { authenticatedUserOf } from './auth.middleware.js';
 import { normalizedEmailSchema } from './auth.schema.js';
 
 export interface RateLimitRule {
@@ -70,4 +71,19 @@ export function createAuthRateLimiters(limits: AuthRateLimits, logger: Logger) {
       keyGenerator: (req) => `account:${loginEmailOf(req) ?? ''}`,
     }),
   };
+}
+
+const ONE_MINUTE_MS = 60 * 1000;
+
+/**
+ * Throttles each signed-in reader across every private route, keyed by the authenticated user,
+ * so one account cannot monopolise the single API instance. Must run after authentication.
+ */
+export function createReaderRateLimiter(requestsPerMinute: number, logger: Logger) {
+  return rateLimit({
+    ...sharedOptionsFor(logger),
+    limit: requestsPerMinute,
+    windowMs: ONE_MINUTE_MS,
+    keyGenerator: (req) => `reader:${authenticatedUserOf(req).userId}`,
+  });
 }

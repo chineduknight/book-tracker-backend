@@ -35,6 +35,7 @@ describe('connectWithRetry', () => {
     const connected = await connectWithRetry(URI, {
       logger: createLogger('warn', logs.stream),
       signal: new AbortController().signal,
+      buildIndexesOnConnect: true,
       retryDelayMs: 1,
     });
 
@@ -55,6 +56,7 @@ describe('connectWithRetry', () => {
     const connected = await connectWithRetry(URI, {
       logger: createLogger('silent'),
       signal: controller.signal,
+      buildIndexesOnConnect: true,
       retryDelayMs: 60_000,
     });
 
@@ -62,12 +64,35 @@ describe('connectWithRetry', () => {
     expect(connect).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    [true, true],
+    [false, false],
+  ])(
+    'passes buildIndexesOnConnect=%s to Mongoose as autoIndex and autoCreate',
+    async (buildIndexesOnConnect, expected) => {
+      const connect = vi.spyOn(mongoose, 'connect').mockResolvedValueOnce(mongoose);
+
+      await connectWithRetry(URI, {
+        logger: createLogger('silent'),
+        signal: new AbortController().signal,
+        buildIndexesOnConnect,
+      });
+
+      expect(connect).toHaveBeenCalledWith(URI, {
+        serverSelectionTimeoutMS: 5_000,
+        autoIndex: expected,
+        autoCreate: expected,
+      });
+    },
+  );
+
   it('does not attempt to connect when already aborted', async () => {
     const connect = vi.spyOn(mongoose, 'connect');
 
     const connected = await connectWithRetry(URI, {
       logger: createLogger('silent'),
       signal: AbortSignal.abort(),
+      buildIndexesOnConnect: true,
     });
 
     expect(connected).toBe(false);

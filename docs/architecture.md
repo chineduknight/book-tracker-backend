@@ -288,13 +288,29 @@ Request flow: `request-logger (request id) → helmet → cors → json (100 kB)
 
 ## Runtime lifecycle
 
-- `server.ts` starts HTTP first, then connects to MongoDB in the background with retries.
-  `/health` is live immediately; `/ready` turns 200 once Mongoose reports `connected`.
-- On `SIGTERM`/`SIGINT` it stops retrying, closes the HTTP server (in-flight requests finish),
-  waits for any pending connection attempt, then disconnects Mongoose. A 10 s timer forces exit
-  if shutdown hangs.
+- `server.ts` validates configuration (production refuses `http://` CORS origins and the
+  destructive tooling variables), then listens through `createHttpServer` (`http-server.ts`), which
+  applies the timeout policy: headers 20 s, whole request 30 s, keep-alive 65 s, idle socket 60 s.
+- It connects to MongoDB in the background with retries (`db/mongo.ts`). Production connects
+  with `autoIndex`/`autoCreate` off; development builds missing indexes additively.
+- Once connected, `db/index-readiness.ts` compares MongoDB's indexes with the schemas read-only
+  (`db/index-verification.ts`, built on `Model.diffIndexes()` over the model registry in
+  `db/application-models.ts`) and rechecks every 30 s until nothing is missing or conflicting.
+  `/health` is live immediately; `/ready` (the health router takes an injected `ReadinessCheck`)
+  turns 200 only when connected **and** verified.
+- `createApp` sets `trust proxy` to `TRUST_PROXY_HOPS` when it is above 0, and composes the
+  optional per-reader limiter after authentication into `requireAuthenticatedUser`.
+- On `SIGTERM`/`SIGINT` it stops retrying and verifying, closes the HTTP server and its idle
+  keep-alive connections (sweeping every 100 ms so connections close as their last request
+  finishes), gives in-flight requests 8 s, closes what remains, waits for a pending connection
+  attempt, then disconnects Mongoose and exits 0. A 10 s timer forces exit; a second signal exits
+  1 immediately.
 - Unhandled rejections and uncaught exceptions are logged as `fatal` and exit with code 1. Like all
   logged errors, they are reduced to name and code (see [decisions.md](decisions.md)).
+- Operator tooling lives in `scripts/` and never runs in the server: `db-indexes.ts` (read-only
+  diff; `--apply` builds missing indexes only, in `scripts/indexes/`), `db-backup.ts` and
+  `db-restore-rehearsal.ts` (`scripts/backup/`). See [index-operations.md](index-operations.md)
+  and [backup-and-restore.md](backup-and-restore.md).
 
 ## Data model overview
 

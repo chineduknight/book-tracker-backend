@@ -14,8 +14,13 @@ function isHttpOrigin(value: string): boolean {
 }
 
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
+const WHOLE_NUMBER = /^(0|[1-9][0-9]*)$/;
 const MINIMUM_SECRET_BYTES = 32;
 const MINIMUM_DISTINCT_SECRET_BYTES = 16;
+export const MAXIMUM_TRUSTED_PROXY_HOPS = 3;
+
+/** Variables of destructive local tooling; a deployed API must never be able to see them. */
+const LOCAL_TOOLING_VARIABLES = ['MONGODB_TEST_URI', 'MONGODB_SMOKE_URI', 'RESTORE_REHEARSAL_URI'];
 
 function looksRandomlyGenerated(secret: Buffer): boolean {
   return new Set(secret).size >= MINIMUM_DISTINCT_SECRET_BYTES;
@@ -54,6 +59,18 @@ const envSchema = z.object({
         .min(1, 'must list at least one origin'),
     ),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+  TRUST_PROXY_HOPS: z
+    .string()
+    .regex(WHOLE_NUMBER, 'must be a whole number of proxy hops such as 0 or 1 (not true or false)')
+    .default('0')
+    .transform(Number)
+    .pipe(z.number().max(MAXIMUM_TRUSTED_PROXY_HOPS, 'must be at most 3')),
+  READER_REQUESTS_PER_MINUTE: z
+    .string()
+    .regex(WHOLE_NUMBER, 'must be a whole number of requests')
+    .transform(Number)
+    .pipe(z.number().min(1, 'must be at least 1').max(10_000, 'must be at most 10000'))
+    .optional(),
   JWT_ACCESS_TOKEN_SECRET: z
     .string({ error: 'is required' })
     .trim()
@@ -73,17 +90,44 @@ export class ConfigError extends Error {
   override readonly name = 'ConfigError';
 }
 
+interface ConfigProblem {
+  variable: string;
+  rule: string;
+}
+
+function productionProblemsOf(env: Env, source: NodeJS.ProcessEnv): ConfigProblem[] {
+  if (env.NODE_ENV !== 'production') return [];
+  return [
+    ...(env.CORS_ORIGIN.some((origin) => !origin.startsWith('https://'))
+      ? [{ variable: 'CORS_ORIGIN', rule: 'must list only https:// origins in production' }]
+      : []),
+    ...LOCAL_TOOLING_VARIABLES.filter((variable) => source[variable] !== undefined).map(
+      (variable) => ({ variable, rule: 'must not be set in production' }),
+    ),
+  ];
+}
+
+function toConfigError(problems: readonly ConfigProblem[]): ConfigError {
+  const lines = problems.map(({ variable, rule }) => `  - ${variable || '(environment)'}: ${rule}`);
+  return new ConfigError(`Invalid environment configuration:\n${lines.join('\n')}`);
+}
+
 /**
  * Validates environment variables. Error messages only name the offending variable and the
  * rule it broke; input values are never echoed, so secrets such as MONGODB_URI stay private.
  */
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): Env {
   const result = envSchema.safeParse(source);
-  if (result.success) return result.data;
+  if (!result.success) {
+    throw toConfigError(
+      result.error.issues.map((issue) => ({
+        variable: issue.path.filter((part) => typeof part === 'string').join('.'),
+        rule: issue.message,
+      })),
+    );
+  }
 
-  const problems = result.error.issues.map((issue) => {
-    const variable = issue.path.filter((part) => typeof part === 'string').join('.');
-    return `  - ${variable || '(environment)'}: ${issue.message}`;
-  });
-  throw new ConfigError(`Invalid environment configuration:\n${problems.join('\n')}`);
+  const productionProblems = productionProblemsOf(result.data, source);
+  if (productionProblems.length > 0) throw toConfigError(productionProblems);
+  return result.data;
 }

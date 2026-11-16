@@ -1,0 +1,36 @@
+# INERT EXAMPLE - NOT A LIVE BLUEPRINT.
+# Kept under docs/ with a .example suffix so Render never detects it. Do not copy it to
+# render.yaml, connect this repository to Render or create any service from it without the
+# owner's explicit approval (docs/deployment-decision.md, docs/release-checklist.md).
+# Field names follow https://render.com/docs/blueprint-spec as read on 2026-11-15; re-check
+# them before use. No value below is a real credential.
+services:
+  - type: web
+    name: book-tracker-api-staging
+    runtime: node
+    plan: free # candidate only; the paid alternative is 0.5c-512mb (Starter)
+    region: frankfurt # cannot be changed after creation; measure latency first
+    numInstances: 1 # rate limits are held in memory: exactly one instance
+    autoDeployTrigger: off # deploys are manual only
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/server.js # node directly, so SIGTERM reaches the process
+    healthCheckPath: /api/v1/ready # never /api/v1/health
+    maxShutdownDelaySeconds: 30 # >= the API's 10 s forced-exit budget
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: '26' # matches .nvmrc; prove the build uses Node 26
+      - key: LOG_LEVEL
+        value: info
+      - key: TRUST_PROXY_HOPS
+        value: '0' # change only after the staging hop-count check (runbook section 5)
+      - key: CORS_ORIGIN
+        sync: false # exact https origin(s) of the frontend, entered in the dashboard
+      - key: MONGODB_URI
+        sync: false # least-privilege Atlas user, readWrite on the app database only
+      - key: JWT_ACCESS_TOKEN_SECRET
+        sync: false # 32 random bytes, base64url, generated fresh for this environment
+      # READER_REQUESTS_PER_MINUTE: unset (off) until the owner chooses a ceiling.
+      # Never set MONGODB_TEST_URI, MONGODB_SMOKE_URI or RESTORE_REHEARSAL_URI here: the API
+      # refuses to start in production when they are present.

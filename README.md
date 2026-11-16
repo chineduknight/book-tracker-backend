@@ -69,32 +69,43 @@ returns 503 until a connection is established (connection attempts are retried e
 Validated with Zod at startup. Invalid configuration aborts with a list of offending variable
 names; values are never printed.
 
-| Variable                  | Required          | Default                 | Notes                                                                                                  |
-| ------------------------- | ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| `MONGODB_URI`             | yes               | —                       | `mongodb://` or `mongodb+srv://`. Keep credentials in `.env`                                           |
-| `NODE_ENV`                | no                | `development`           | `development` \| `test` \| `production`                                                                |
-| `PORT`                    | no                | `3000`                  | 1–65535                                                                                                |
-| `CORS_ORIGIN`             | no                | `http://localhost:5173` | Comma-separated exact origins. `*` is rejected                                                         |
-| `LOG_LEVEL`               | no                | `info`                  | `fatal` `error` `warn` `info` `debug` `trace` `silent`                                                 |
-| `JWT_ACCESS_TOKEN_SECRET` | yes               | —                       | Signs access tokens. base64url, at least 32 random bytes; see Getting started                          |
-| `MONGODB_TEST_URI`        | integration tests | —                       | `mongodb://127.0.0.1:27017/book-tracker-test`: one local host, that database; anything else is refused |
+| Variable                     | Required          | Default                 | Notes                                                                                                                                                               |
+| ---------------------------- | ----------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MONGODB_URI`                | yes               | —                       | `mongodb://` or `mongodb+srv://`. Keep credentials in `.env`                                                                                                        |
+| `NODE_ENV`                   | no                | `development`           | `development` \| `test` \| `production`                                                                                                                             |
+| `PORT`                       | no                | `3000`                  | 1–65535                                                                                                                                                             |
+| `CORS_ORIGIN`                | no                | `http://localhost:5173` | Comma-separated exact origins. `*` is rejected                                                                                                                      |
+| `LOG_LEVEL`                  | no                | `info`                  | `fatal` `error` `warn` `info` `debug` `trace` `silent`                                                                                                              |
+| `JWT_ACCESS_TOKEN_SECRET`    | yes               | —                       | Signs access tokens. base64url, at least 32 random bytes; see Getting started                                                                                       |
+| `TRUST_PROXY_HOPS`           | no                | `0`                     | Number of reverse proxies in front of the API (0–3); never `true`. Set only after the [hop-count check](docs/deployment-runbook.md#5-proxy-hop-count-check-staging) |
+| `READER_REQUESTS_PER_MINUTE` | no                | off                     | Optional per-reader limit across private routes (1–10000); off unless the owner approves a value                                                                    |
+| `MONGODB_TEST_URI`           | integration tests | —                       | `mongodb://127.0.0.1:27017/book-tracker-test`: one local host, that database; anything else is refused                                                              |
+| `RESTORE_REHEARSAL_URI`      | restore rehearsal | —                       | `mongodb://127.0.0.1:27017/book-tracker-restore-rehearsal`: local, that database, empty                                                                             |
+
+In production (`NODE_ENV=production`), `CORS_ORIGIN` must list only `https://` origins and
+`MONGODB_TEST_URI`, `MONGODB_SMOKE_URI` and `RESTORE_REHEARSAL_URI` must not be set; the API
+refuses to start otherwise. Production also never builds indexes on connect, and `/ready` stays
+`503` until every required index exists ([docs/index-operations.md](docs/index-operations.md)).
 
 `.env` and other `.env.*` files are git-ignored; only `.env.example` (fake values) is committed.
 
 ## Scripts
 
-| Command                    | What it does                                                                                             |
-| -------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `npm run dev`              | Watch mode via `tsx`, loads `.env`, pretty logs                                                          |
-| `npm run build`            | Compile `src/` → `dist/` with `tsc`                                                                      |
-| `npm start`                | Run the compiled server (`dist/server.js`), loads `.env` if present                                      |
-| `npm run typecheck`        | Type-check sources, tests and configs                                                                    |
-| `npm run lint`             | ESLint                                                                                                   |
-| `npm run format`           | Prettier write (`format:check` to verify)                                                                |
-| `npm test`                 | Unit and HTTP tests without a database (`test:watch` for watch mode)                                     |
-| `npm run test:integration` | MongoDB-backed tests; requires `MONGODB_TEST_URI` and fails without it                                   |
-| `npm run api:test`         | Run the Bruno collection against the local API                                                           |
-| `npm run api:smoke`        | Build, start a fresh API on port 3100 against `book-tracker-smoke`, run the whole Bruno collection, stop |
+| Command                        | What it does                                                                                                                                    |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dev`                  | Watch mode via `tsx`, loads `.env`, pretty logs                                                                                                 |
+| `npm run build`                | Compile `src/` → `dist/` with `tsc`                                                                                                             |
+| `npm start`                    | Run the compiled server (`dist/server.js`), loads `.env` if present                                                                             |
+| `npm run typecheck`            | Type-check sources, tests and configs                                                                                                           |
+| `npm run lint`                 | ESLint                                                                                                                                          |
+| `npm run format`               | Prettier write (`format:check` to verify)                                                                                                       |
+| `npm test`                     | Unit and HTTP tests without a database (`test:watch` for watch mode)                                                                            |
+| `npm run test:integration`     | MongoDB-backed tests; requires `MONGODB_TEST_URI` and fails without it                                                                          |
+| `npm run api:test`             | Run the Bruno collection against the local API                                                                                                  |
+| `npm run api:smoke`            | Build, start a fresh API on port 3100 against `book-tracker-smoke`, run the whole Bruno collection, stop                                        |
+| `npm run db:indexes`           | Read-only index check against `MONGODB_URI`; `-- --apply --confirm-database=<name>` builds missing ones only ([docs](docs/index-operations.md)) |
+| `npm run db:backup`            | `mongodump` of `MONGODB_URI` into a private, checksummed archive: `-- --out-dir=<dir outside the repo>` ([docs](docs/backup-and-restore.md))    |
+| `npm run db:restore-rehearsal` | Restore an archive into the empty local `book-tracker-restore-rehearsal` database and verify it ([docs](docs/backup-and-restore.md))            |
 
 ## API
 
@@ -189,7 +200,8 @@ src/
 ├── app.ts                 # Express assembly: middleware, /api/v1 router, 404 + error handlers
 ├── server.ts              # Process entry: config, listen, DB connect, graceful shutdown
 ├── config/                # env.ts (Zod-validated env), logger.ts (pino + redaction)
-├── db/                    # mongo.ts (connect with retry, readiness, disconnect)
+├── db/                    # connect with retry, model registry, read-only index verification
+├── http-server.ts         # Node HTTP server with the timeout policy
 ├── middleware/            # request id + logging, 404 and centralised error handling
 ├── modules/auth/          # register, login, sessions, tokens, rate limits, auth middleware
 ├── modules/books/         # book catalogue: model, schemas, DTOs, service, routes
@@ -210,13 +222,27 @@ src/
 test/                      # Vitest + Supertest without a database
 test/integration/          # Vitest + Supertest against a real MongoDB (book-tracker-test)
 bruno/                     # Bruno collection (API docs + executable examples)
-scripts/                   # api-smoke.ts: fresh API instance + whole Bruno collection
-docs/                      # architecture, decisions, API contract, operations runbook
+scripts/                   # api-smoke.ts, db-indexes.ts, db-backup.ts, db-restore-rehearsal.ts
+docs/                      # architecture, decisions, API contract, deployment and operations
 AGENTS.md                  # engineering standards (CLAUDE.md imports it)
 ```
 
 See [docs/architecture.md](docs/architecture.md), [docs/decisions.md](docs/decisions.md) and the
 [operations runbook](docs/operations.md).
+
+## Deployment and operations
+
+Not deployed. The API is prepared for a single-instance deployment; the provider, plan, region,
+budget and first deployment await the owner's approval.
+
+- [Deployment decision](docs/deployment-decision.md): hosting and Atlas options, costs, candidates
+- [Deployment runbook](docs/deployment-runbook.md): configuration, build/start, staging, proxy
+  hop-count check, smoke checklist, rollback
+- [Release checklist](docs/release-checklist.md): go/no-go gates, ending in owner approval
+- [Index operations](docs/index-operations.md): required indexes, read-only check, additive builds
+- [Backup and restore](docs/backup-and-restore.md): backups, rehearsals, manual recovery
+- [Monitoring and budget](docs/monitoring-and-budget.md): probes, logs, alerts, limits, incidents
+- [Inert Render example](docs/examples/render.yaml.example) (auto-deploy off; not a live Blueprint)
 
 ## Running the integration tests
 
@@ -261,10 +287,12 @@ Markdown, bounded and private), tests, CI, Bruno.
 Not included yet: email verification, password reset, OAuth, import/restore, loan reminders, wish un-acquire,
 nested categories,
 membership reordering, automatic classification, book or note restore, location deletion,
-reading-session deletion, UI, deployment.
+reading-session deletion, UI, a live deployment (the code, tooling and runbooks for one are
+ready; see Deployment and operations).
 
 ## Upcoming PRs
 
-1. **Deployment and operations** (hosting, MongoDB Atlas, index rollout, backups, reverse proxy,
-   probes, observability). The backend hardening audit and its follow-ups are in
-   [docs/hardening-audit.md](docs/hardening-audit.md).
+1. **First deployment** to an approved staging environment, then production, following the
+   [release checklist](docs/release-checklist.md), once the owner has chosen the provider, plan,
+   region and budget.
+2. **Frontend.**
