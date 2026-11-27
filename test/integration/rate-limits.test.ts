@@ -129,7 +129,7 @@ describe('authentication throttling', () => {
     expect(statuses).toEqual([201, 201, 429]);
   });
 
-  it('limits refresh and logout attempts per source address', async () => {
+  it('limits logout attempts per source address, with the other sign-in requests', async () => {
     const app = createAuthTestApp({
       authRateLimits: {
         ...UNLIMITED_AUTH_RATE_LIMITS,
@@ -138,11 +138,37 @@ describe('authentication throttling', () => {
     });
 
     const statuses: number[] = [];
-    for (const path of ['refresh', 'logout', 'refresh', 'logout']) {
-      const res = await request(app).post(`/api/v1/auth/${path}`).send({ refreshToken: 'guess' });
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const res = await request(app).post('/api/v1/auth/logout').send({ refreshToken: 'guess' });
       statuses.push(res.status);
     }
 
     expect(statuses).toEqual([401, 401, 401, 429]);
+  });
+
+  it('gives refreshes their own allowance, so they never use up sign-ins', async () => {
+    const app = createAuthTestApp({
+      authRateLimits: {
+        ...UNLIMITED_AUTH_RATE_LIMITS,
+        authRequestsPerIp: { limit: 2, windowMs: WINDOW_MS },
+        refreshesPerIp: { limit: 3, windowMs: WINDOW_MS },
+      },
+    });
+
+    const refreshStatuses: number[] = [];
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const res = await request(app).post('/api/v1/auth/refresh').send({ refreshToken: 'guess' });
+      refreshStatuses.push(res.status);
+    }
+    expect(refreshStatuses).toEqual([401, 401, 401, 429]);
+
+    const loginStatuses: number[] = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: 'nobody@example.test', password: disposablePassword() });
+      loginStatuses.push(res.status);
+    }
+    expect(loginStatuses).toEqual([401, 401]);
   });
 });

@@ -118,12 +118,13 @@ The API uses bearer tokens carried in JSON, not cookies, so CORS stays `credenti
 - **Replay policy:** presenting a refresh token that was already exchanged revokes its session (reason `refresh_token_reuse`), so a stolen token cannot keep a session alive. Clients must not send concurrent refreshes with the same token: only one succeeds and the session is then revoked. A token that matches nothing (for example a guess) is rejected without affecting any session. Reuse detection covers every token the session has issued, for the session's whole lifetime.
 - **Throttling** (per API instance, in memory; responses carry `RateLimit` headers and `Retry-After` when blocked):
 
-| Limit                     | Applies to                                    | Default            |
-| ------------------------- | --------------------------------------------- | ------------------ |
-| Auth requests per address | `register`, `login`, `refresh`, `logout`      | 100 per 15 minutes |
-| Registrations per address | `register` (all attempts)                     | 20 per hour        |
-| Failed logins per address | `login` responses with status ≥ 400           | 30 per 15 minutes  |
-| Failed logins per account | `login` responses with status ≥ 400, by email | 10 per 15 minutes  |
+| Limit                     | Applies to                                    | Default              |
+| ------------------------- | --------------------------------------------- | -------------------- |
+| Auth requests per address | `register`, `login`, `logout`                 | 100 per 15 minutes   |
+| Refreshes per address     | `refresh`                                     | 1,500 per 15 minutes |
+| Registrations per address | `register` (all attempts)                     | 20 per hour          |
+| Failed logins per address | `login` responses with status ≥ 400           | 30 per 15 minutes    |
+| Failed logins per account | `login` responses with status ≥ 400, by email | 10 per 15 minutes    |
 
 Limits are temporary windows, never a permanent lockout. The per-account limit lets someone delay a known user's login for up to 15 minutes; that is the accepted trade-off against unlimited password guessing.
 

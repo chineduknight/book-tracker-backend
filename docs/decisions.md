@@ -490,3 +490,12 @@ await the owner ([deployment-decision.md](deployment-decision.md)).
 - **No automatic deployment.** CI verifies only (`contents: read`, no deploy secrets); hosts run
   with auto-deploy off; every deployment follows [release-checklist.md](release-checklist.md)
   with the owner's approval.
+- **Refreshes have their own allowance (owner decision, 2026-11-27).** Behind the web app's
+  server-side BFF, every reader's request reaches the API from the same address, so the shared
+  100-per-15-minutes allowance for `register`, `login`, `refresh` and `logout` was spent by
+  automatic refreshes (about one per active session every 14 minutes) and could block sign-ins
+  for everyone. `refresh` now has its own per-address ceiling (1,500 per 15 minutes) and no longer
+  counts against sign-ins. Refresh tokens are 256 random bits and a reused token revokes its
+  session, so this ceiling bounds request floods rather than guessing; counting per account would
+  need a lookup before every refresh. Sign-in, registration and logout still share their
+  allowance; a forwarded client address from the BFF remains the option if that becomes a limit.
