@@ -57,7 +57,7 @@ export function createAuthRouter({
     },
   );
 
-  authRouter.post('/refresh', limiters.limitAuthRequestsPerIp, async (req, res) => {
+  authRouter.post('/refresh', limiters.limitRefreshesPerIp, async (req, res) => {
     const { refreshToken } = parseRequestBody(refreshTokenRequestSchema, req.body);
     const tokens = await authService.refreshSession(refreshToken);
     res.status(200).json({ data: { tokens } } satisfies RefreshedSessionResponseBody);

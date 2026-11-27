@@ -12,6 +12,7 @@ export interface RateLimitRule {
 
 export interface AuthRateLimits {
   authRequestsPerIp: RateLimitRule;
+  refreshesPerIp: RateLimitRule;
   registrationsPerIp: RateLimitRule;
   failedLoginsPerIp: RateLimitRule;
   failedLoginsPerAccount: RateLimitRule;
@@ -22,6 +23,11 @@ const ONE_HOUR_MS = 60 * 60 * 1000;
 
 export const DEFAULT_AUTH_RATE_LIMITS: AuthRateLimits = {
   authRequestsPerIp: { limit: 100, windowMs: FIFTEEN_MINUTES_MS },
+  // Refreshes are kept out of the shared sign-in allowance: behind a web app every reader's
+  // refresh arrives from the same address, about once per 14 minutes per active session, which
+  // would use up sign-ins for everyone. Refresh tokens carry 256 random bits and a reused token
+  // revokes its session, so this ceiling only bounds request floods, not guessing.
+  refreshesPerIp: { limit: 1_500, windowMs: FIFTEEN_MINUTES_MS },
   registrationsPerIp: { limit: 20, windowMs: ONE_HOUR_MS },
   failedLoginsPerIp: { limit: 30, windowMs: FIFTEEN_MINUTES_MS },
   failedLoginsPerAccount: { limit: 10, windowMs: FIFTEEN_MINUTES_MS },
@@ -57,6 +63,7 @@ export function createAuthRateLimiters(limits: AuthRateLimits, logger: Logger) {
   const sharedOptions = sharedOptionsFor(logger);
   return {
     limitAuthRequestsPerIp: rateLimit({ ...sharedOptions, ...limits.authRequestsPerIp }),
+    limitRefreshesPerIp: rateLimit({ ...sharedOptions, ...limits.refreshesPerIp }),
     limitRegistrationsPerIp: rateLimit({ ...sharedOptions, ...limits.registrationsPerIp }),
     limitFailedLoginsPerIp: rateLimit({
       ...sharedOptions,

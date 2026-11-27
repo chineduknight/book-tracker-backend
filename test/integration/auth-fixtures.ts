@@ -17,6 +17,7 @@ const UNLIMITED = { limit: 10_000, windowMs: 60_000 };
 
 export const UNLIMITED_AUTH_RATE_LIMITS: AuthRateLimits = {
   authRequestsPerIp: UNLIMITED,
+  refreshesPerIp: UNLIMITED,
   registrationsPerIp: UNLIMITED,
   failedLoginsPerIp: UNLIMITED,
   failedLoginsPerAccount: UNLIMITED,
